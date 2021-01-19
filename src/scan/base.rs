@@ -1,4 +1,5 @@
 use std::{
+	convert::TryInto,
 	fs::{File, OpenOptions},
 	io::{Read, Seek, SeekFrom}
 };
@@ -10,9 +11,7 @@ use crate::{
 	process::{ProcessContext, PtraceAttachError}
 };
 
-use super::callback::ScanCallback;
-use super::scanner::ByteScanner;
-use super::{ScanFlow, ScanEntry};
+use super::{callback::ScanCallback, scanner::ByteScanner, ScanEntry, ScanFlow};
 
 #[derive(Debug, Error)]
 pub enum ScanError {
@@ -73,12 +72,12 @@ impl ScannerContextBase {
 	) -> Result<(), ScanError> {
 		// Seek to the page location
 		self.mem_ro
-			.seek(SeekFrom::Start(entry.address_range[0] as u64))?;
+			.seek(SeekFrom::Start(entry.address_range[0].get() as u64))?;
 
 		// Scan the memory page
-		Self::scan_data(
+		Self::scan_page(
 			&mut self.mem_ro,
-			entry.address_range[0] .. entry.address_range[1],
+			entry.address_range[0].get() .. entry.address_range[1].get(),
 			unaligned,
 			callback
 		)?;
@@ -86,7 +85,7 @@ impl ScannerContextBase {
 		Ok(())
 	}
 
-	fn scan_data(
+	fn scan_page(
 		mut data: impl Read,
 		address_range: std::ops::Range<usize>,
 		unaligned: bool,
@@ -95,6 +94,7 @@ impl ScannerContextBase {
 		let mut byte = [0u8; 1];
 		let mut scanner = ByteScanner::new();
 
+		let page_end = address_range.end;
 		for current_offset in address_range {
 			data.read_exact(&mut byte)?;
 			scanner.push(byte[0]);
@@ -108,9 +108,28 @@ impl ScannerContextBase {
 				) => {
 					$(
 						if scanner.$ready_fn::<$local_type>() {
-							let flow = callback.handle(
+							// handle page start callback
+							if scanner.count() == std::mem::size_of::<$local_type>() {
+								let flow = callback.page_start(
+									ScanEntry::$local_type(
+										(
+											current_offset + 1 - std::mem::size_of::<$local_type>()
+										).try_into().unwrap(),
+										scanner.read::<$local_type>()
+									)
+								);
+
+								if flow == ScanFlow::Break {
+									break;
+								}
+							}
+
+							// handle entr callback
+							let flow = callback.entry(
 								ScanEntry::$local_type(
-									current_offset + 1 - std::mem::size_of::<$local_type>(),
+									(
+										current_offset + 1 - std::mem::size_of::<$local_type>()
+									).try_into().unwrap(),
 									scanner.read::<$local_type>()
 								)
 							);
@@ -136,32 +155,38 @@ impl ScannerContextBase {
 			}
 		}
 
+		callback.page_end((page_end - 1).into());
+
 		Ok(())
 	}
 }
 
 #[cfg(test)]
 mod test {
+	use std::convert::TryInto;
+
 	use crate::scan::callback::ScanCallbackClosure;
 
-    use super::{super::{ScanEntry, ScanFlow}, ScannerContextBase};
+	use super::{
+		super::{ScanEntry, ScanFlow},
+		ScannerContextBase
+	};
 
 	#[test]
 	fn test_scanner_context_base() {
 		let data: [u8; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
 
 		let mut entries = Vec::<ScanEntry>::new();
-		ScannerContextBase::scan_data(
-			data.as_ref(), 
-			0 .. data.len(), 
-			false, 
-			ScanCallbackClosure::from(
-				|entry| {
-					entries.push(entry);
-					ScanFlow::Continue
-				}
-			)
-		).unwrap();
+		ScannerContextBase::scan_page(
+			data.as_ref(),
+			10 .. 10 + data.len(),
+			false,
+			ScanCallbackClosure(|entry| {
+				entries.push(entry);
+				ScanFlow::Continue
+			})
+		)
+		.unwrap();
 
 		macro_rules! assert_contains_all {
 			(
@@ -181,29 +206,35 @@ mod test {
 		dbg!(&entries);
 		assert_contains_all!(
 			ScanEntry::u64(
-				0,
+				10.try_into().unwrap(),
 				0 + (1 << 8)
 					+ (2 << 16) + (3 << 24)
 					+ (4 << 32) + (5 << 40)
 					+ (6 << 48) + (7 << 56)
 			),
-			ScanEntry::f64(0, f64::from_ne_bytes(data)),
-			ScanEntry::u32(0, 0 + (1 << 8) + (2 << 16) + (3 << 24)),
-			ScanEntry::f32(0, f32::from_ne_bytes([data[0], data[1], data[2], data[3]])),
-			ScanEntry::u32(4, 4 + (5 << 8) + (6 << 16) + (7 << 24)),
-			ScanEntry::f32(4, f32::from_ne_bytes([data[4], data[5], data[6], data[7]])),
-			ScanEntry::u16(0, 0 + (1 << 8)),
-			ScanEntry::u16(2, 2 + (3 << 8)),
-			ScanEntry::u16(4, 4 + (5 << 8)),
-			ScanEntry::u16(6, 6 + (7 << 8)),
-			ScanEntry::u8(0, 0),
-			ScanEntry::u8(1, 1),
-			ScanEntry::u8(2, 2),
-			ScanEntry::u8(3, 3),
-			ScanEntry::u8(4, 4),
-			ScanEntry::u8(5, 5),
-			ScanEntry::u8(6, 6),
-			ScanEntry::u8(7, 7),
+			ScanEntry::f64(10.try_into().unwrap(), f64::from_ne_bytes(data)),
+			ScanEntry::u32(10.try_into().unwrap(), 0 + (1 << 8) + (2 << 16) + (3 << 24)),
+			ScanEntry::f32(
+				10.try_into().unwrap(),
+				f32::from_ne_bytes([data[0], data[1], data[2], data[3]])
+			),
+			ScanEntry::u32(14.try_into().unwrap(), 4 + (5 << 8) + (6 << 16) + (7 << 24)),
+			ScanEntry::f32(
+				14.try_into().unwrap(),
+				f32::from_ne_bytes([data[4], data[5], data[6], data[7]])
+			),
+			ScanEntry::u16(10.try_into().unwrap(), 0 + (1 << 8)),
+			ScanEntry::u16(12.try_into().unwrap(), 2 + (3 << 8)),
+			ScanEntry::u16(14.try_into().unwrap(), 4 + (5 << 8)),
+			ScanEntry::u16(16.try_into().unwrap(), 6 + (7 << 8)),
+			ScanEntry::u8(10.try_into().unwrap(), 0),
+			ScanEntry::u8(11.try_into().unwrap(), 1),
+			ScanEntry::u8(12.try_into().unwrap(), 2),
+			ScanEntry::u8(13.try_into().unwrap(), 3),
+			ScanEntry::u8(14.try_into().unwrap(), 4),
+			ScanEntry::u8(15.try_into().unwrap(), 5),
+			ScanEntry::u8(16.try_into().unwrap(), 6),
+			ScanEntry::u8(17.try_into().unwrap(), 7),
 		);
 	}
 }

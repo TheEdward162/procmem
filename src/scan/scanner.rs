@@ -1,6 +1,5 @@
 use super::ScanPrimitiveType;
 
-// TODO: Const generics
 #[derive(Debug)]
 #[repr(C, align(8))]
 pub struct ByteScanner {
@@ -46,6 +45,12 @@ impl ByteScanner {
 		self.count >= std::mem::size_of::<T>()
 	}
 
+	/// Returns number of bytes pushed.
+	pub fn count(&self) -> usize {
+		self.count
+	}
+
+	/// Resets the internal counter, treating the next push as if it was the first.
 	pub fn reset(&mut self) {
 		self.count = 0;
 	}
@@ -59,9 +64,10 @@ impl ByteScanner {
 
 		// This is safe because ScanPrimitiveType trait guarantees valid memory representation
 		unsafe {
-			let ptr = self.buffer.as_ptr().add(
-				Self::BUFFER_SIZE - std::mem::size_of::<T>()
-			) as *const T;
+			let ptr = self
+				.buffer
+				.as_ptr()
+				.add(Self::BUFFER_SIZE - std::mem::size_of::<T>()) as *const T;
 
 			*ptr
 		}
@@ -148,10 +154,7 @@ mod test {
 
 			assert_eq!(scanner.ready::<u32>(), true);
 			assert_eq!(scanner.ready_unaligned::<u32>(), true);
-			assert_eq!(
-				scanner.read::<u32>(),
-				1 + (2 << 8) + (3 << 16) + (4 << 24)
-			);
+			assert_eq!(scanner.read::<u32>(), 1 + (2 << 8) + (3 << 16) + (4 << 24));
 
 			assert_eq!(scanner.ready::<u16>(), true);
 			assert_eq!(scanner.ready_unaligned::<u16>(), true);
@@ -170,10 +173,7 @@ mod test {
 
 			assert_eq!(scanner.ready::<u32>(), false);
 			assert_eq!(scanner.ready_unaligned::<u32>(), true);
-			assert_eq!(
-				scanner.read::<u32>(),
-				2 + (3 << 8) + (4 << 16) + (5 << 24)
-			);
+			assert_eq!(scanner.read::<u32>(), 2 + (3 << 8) + (4 << 16) + (5 << 24));
 
 			assert_eq!(scanner.ready::<u16>(), false);
 			assert_eq!(scanner.ready_unaligned::<u16>(), true);
@@ -192,10 +192,7 @@ mod test {
 
 			assert_eq!(scanner.ready::<u32>(), false);
 			assert_eq!(scanner.ready_unaligned::<u32>(), true);
-			assert_eq!(
-				scanner.read::<u32>(),
-				3 + (4 << 8) + (5 << 16) + (6 << 24)
-			);
+			assert_eq!(scanner.read::<u32>(), 3 + (4 << 8) + (5 << 16) + (6 << 24));
 
 			assert_eq!(scanner.ready::<u16>(), true);
 			assert_eq!(scanner.ready_unaligned::<u16>(), true);
@@ -214,10 +211,7 @@ mod test {
 
 			assert_eq!(scanner.ready::<u32>(), false);
 			assert_eq!(scanner.ready_unaligned::<u32>(), true);
-			assert_eq!(
-				scanner.read::<u32>(),
-				4 + (5 << 8) + (6 << 16) + (7 << 24)
-			);
+			assert_eq!(scanner.read::<u32>(), 4 + (5 << 8) + (6 << 16) + (7 << 24));
 
 			assert_eq!(scanner.ready::<u16>(), false);
 			assert_eq!(scanner.ready_unaligned::<u16>(), true);
@@ -243,10 +237,7 @@ mod test {
 
 			assert_eq!(scanner.ready::<u32>(), true);
 			assert_eq!(scanner.ready_unaligned::<u32>(), true);
-			assert_eq!(
-				scanner.read::<u32>(),
-				5 + (6 << 8) + (7 << 16) + (8 << 24)
-			);
+			assert_eq!(scanner.read::<u32>(), 5 + (6 << 8) + (7 << 16) + (8 << 24));
 
 			assert_eq!(scanner.ready::<u16>(), true);
 			assert_eq!(scanner.ready_unaligned::<u16>(), true);

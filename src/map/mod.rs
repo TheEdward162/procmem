@@ -13,7 +13,7 @@ pub enum LoadMapError {
 	Parse(#[from] MemoryMapEntryParseError)
 }
 
-pub type MemoryPageIndex = usize;
+pub type MemoryPageIndex = crate::util::OffsetType;
 
 pub struct MemoryMap {
 	entries: HashMap<MemoryPageIndex, MemoryMapEntry>
@@ -29,7 +29,7 @@ impl MemoryMap {
 
 		for line in buffer.lines() {
 			let entry: MemoryMapEntry = line.parse()?;
-			entries.insert(entry.address_range[0], entry);
+			entries.insert(entry.address_range[0].into(), entry);
 		}
 
 		Ok(MemoryMap { entries })

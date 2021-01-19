@@ -3,15 +3,36 @@ use super::{ScanEntry, ScanFlow};
 pub mod array;
 
 /// Scan callback that is used to control and process output of the scanning.
+#[allow(unused_variables)]
 pub trait ScanCallback {
-	/// Handles one scan entry.
+	/// Called for each scan entry.
 	///
 	/// Return value indicates to the scanner whether to continue scanning or end the scan.
-	fn handle(&mut self, entry: ScanEntry) -> ScanFlow;
+	fn entry(&mut self, entry: ScanEntry) -> ScanFlow;
+
+	/// Called for each first scanned data type on each page.
+	///
+	/// [entry](#ScanCallback::entry) is still called for each entry.
+	fn page_start(&mut self, entry: ScanEntry) -> ScanFlow {
+		ScanFlow::Continue
+	}
+
+	/// Called after each page.
+	///
+	/// `offset` is the last offset belonging to the page.
+	fn page_end(&mut self, offset: crate::util::OffsetType) {}
 }
 impl<T: ScanCallback + ?Sized, D: std::ops::DerefMut<Target = T>> ScanCallback for D {
-	fn handle(&mut self, entry: ScanEntry) -> ScanFlow {
-		(**self).handle(entry)
+	fn entry(&mut self, entry: ScanEntry) -> ScanFlow {
+		(**self).entry(entry)
+	}
+
+	fn page_start(&mut self, entry: ScanEntry) -> ScanFlow {
+		(**self).page_start(entry)
+	}
+
+	fn page_end(&mut self, offset: crate::util::OffsetType) {
+		(**self).page_end(offset)
 	}
 }
 
@@ -21,18 +42,9 @@ impl<T: ScanCallback + ?Sized, D: std::ops::DerefMut<Target = T>> ScanCallback f
 // 		self(entry)
 // 	}
 // }
-pub struct ScanCallbackClosure<C: FnMut(ScanEntry) -> ScanFlow> {
-	closure: C
-}
+pub struct ScanCallbackClosure<C: FnMut(ScanEntry) -> ScanFlow>(pub C);
 impl<C: FnMut(ScanEntry) -> ScanFlow> ScanCallback for ScanCallbackClosure<C> {
-	fn handle(&mut self, entry: ScanEntry) -> ScanFlow {
-		(self.closure)(entry)
-	}
-}
-impl<C: FnMut(ScanEntry) -> ScanFlow> From<C> for ScanCallbackClosure<C> {
-	fn from(closure: C) -> Self {
-		ScanCallbackClosure {
-			closure
-		}
+	fn entry(&mut self, entry: ScanEntry) -> ScanFlow {
+		(self.0)(entry)
 	}
 }

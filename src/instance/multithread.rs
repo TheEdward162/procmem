@@ -1,7 +1,7 @@
 use std::{sync::{Mutex, Arc, mpsc::{self, Sender, Receiver}}, thread::JoinHandle};
 use std::ops::DerefMut;
 
-use crate::{map::MemoryPageIndex, process::ProcessContext, scan::{ScanEntry, ScanFlow, ScannerContextBase}};
+use crate::{map::MemoryPageIndex, process::ProcessContext, scan::{ScanEntry, ScanFlow, base::{ScannerContextBase, ScanError}}};
 
 
 #[derive(Debug)]
@@ -55,6 +55,7 @@ impl MultithreadInstance {
 		);
 	}
 	
+	/*
 	/// Stops one of the scanner threads.
 	// TODO: needs more design work
 	pub fn stop_scanner(&mut self) {
@@ -66,6 +67,7 @@ impl MultithreadInstance {
 			}
 		}
 	}
+	*/
 
 	pub fn scan(
 		&mut self,
@@ -195,7 +197,7 @@ impl ScannerThread {
 
 	fn consume_queue(
 		receiver: &Receiver<ScanThreadRequest>,
-		request_queue: &mut Vec<(usize, bool)>
+		request_queue: &mut Vec<(MemoryPageIndex, bool)>
 	) -> ScannerThreadFlow {
 		for request in receiver.try_iter() {
 			match request {

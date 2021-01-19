@@ -1,27 +1,26 @@
-use std::any::TypeId;
-use std::ops::Deref;
+use std::{any::TypeId, ops::Deref};
+
+use crate::util::OffsetType;
 
 pub mod base;
-pub mod scanner;
 pub mod callback;
+pub mod scanner;
 
 /// Trait for types that appear in scan entries.
 ///
 /// ## Safety
 /// This trait is unsafe because `ByteScanner` relies on valid memory representation of these values
-pub unsafe trait ScanPrimitiveType: 'static + Sized + PartialEq + Copy + std::fmt::Debug {
+pub unsafe trait ScanPrimitiveType:
+	'static + Sized + PartialEq + Copy + std::fmt::Debug
+{
 	fn try_cast<T: 'static + Sized>(value: T) -> Option<Self> {
 		if TypeId::of::<T>() == TypeId::of::<Self>() {
 			let fragile = std::mem::ManuallyDrop::new(value);
-			
+
 			// This is safe because we just checked that the TypeId of T and Self are equal => they are the same type
-			let value: Self = unsafe {
-				std::ptr::read(fragile.deref() as *const T as *const Self)
-			};
-			
-			Some(
-				value
-			)
+			let value: Self = unsafe { std::ptr::read(fragile.deref() as *const T as *const Self) };
+
+			Some(value)
 		} else {
 			None
 		}
@@ -55,7 +54,7 @@ impl ScanEntryData {
 			ScanEntryData::u64(v) => T::try_cast(*v),
 			ScanEntryData::usize(v) => T::try_cast(*v),
 			ScanEntryData::f32(v) => T::try_cast(*v),
-			ScanEntryData::f64(v) => T::try_cast(*v),
+			ScanEntryData::f64(v) => T::try_cast(*v)
 		}
 	}
 }
@@ -63,54 +62,54 @@ impl ScanEntryData {
 #[derive(Debug, PartialEq)]
 pub struct ScanEntry {
 	/// Offset in the memory - basically the pointer into the process memory space.
-	pub offset: usize,
+	pub offset: OffsetType,
 	/// Data at the scanned offset.
 	pub data: ScanEntryData
 }
 impl ScanEntry {
-	pub fn u8(offset: usize, data: u8) -> Self {
+	pub fn u8(offset: OffsetType, data: u8) -> Self {
 		ScanEntry {
 			offset,
 			data: ScanEntryData::u8(data)
 		}
 	}
 
-	pub fn u16(offset: usize, data: u16) -> Self {
+	pub fn u16(offset: OffsetType, data: u16) -> Self {
 		ScanEntry {
 			offset,
 			data: ScanEntryData::u16(data)
 		}
 	}
 
-	pub fn u32(offset: usize, data: u32) -> Self {
+	pub fn u32(offset: OffsetType, data: u32) -> Self {
 		ScanEntry {
 			offset,
 			data: ScanEntryData::u32(data)
 		}
 	}
 
-	pub fn u64(offset: usize, data: u64) -> Self {
+	pub fn u64(offset: OffsetType, data: u64) -> Self {
 		ScanEntry {
 			offset,
 			data: ScanEntryData::u64(data)
 		}
 	}
 
-	pub fn usize(offset: usize, data: usize) -> Self {
+	pub fn usize(offset: OffsetType, data: usize) -> Self {
 		ScanEntry {
 			offset,
 			data: ScanEntryData::usize(data)
 		}
 	}
 
-	pub fn f32(offset: usize, data: f32) -> Self {
+	pub fn f32(offset: OffsetType, data: f32) -> Self {
 		ScanEntry {
 			offset,
 			data: ScanEntryData::f32(data)
 		}
 	}
 
-	pub fn f64(offset: usize, data: f64) -> Self {
+	pub fn f64(offset: OffsetType, data: f64) -> Self {
 		ScanEntry {
 			offset,
 			data: ScanEntryData::f64(data)

@@ -1,6 +1,13 @@
 use thiserror::Error;
 
-use crate::{map::MemoryPageIndex, process::{ProcessContext, ProcessContextError}, scan::{base::{ScanError, ScannerContextBase, ScannerContextBaseError}, callback::ScanCallback}};
+use crate::{
+	map::MemoryPageIndex,
+	process::{ProcessContext, ProcessContextError},
+	scan::{
+		base::{ScanError, ScannerContextBase, ScannerContextBaseError},
+		callback::ScanCallback
+	}
+};
 
 #[derive(Debug, Error)]
 pub enum SinglethreadInstanceError {
@@ -33,12 +40,8 @@ impl SinglethreadInstance {
 		callback: impl ScanCallback
 	) -> Result<(), ScanError> {
 		unsafe {
-			self.scanner.scan(
-				&mut self.process,
-				page,
-				unaligned,
-				callback
-			)
+			self.scanner
+				.scan(&mut self.process, page, unaligned, callback)
 		}
 	}
 }

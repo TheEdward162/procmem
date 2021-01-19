@@ -1,12 +1,15 @@
 use std::{
 	fs::{File, OpenOptions},
-	io::{Seek, SeekFrom, Read, Write},
+	io::{Read, Seek, SeekFrom, Write},
 	path::PathBuf
 };
 
 use thiserror::Error;
 
-use crate::map::{LoadMapError, MemoryMap};
+use crate::{
+	map::{LoadMapError, MemoryMap},
+	util::OffsetType
+};
 
 #[derive(Debug, Error)]
 pub enum ProcessContextError {
@@ -38,11 +41,9 @@ pub enum WriteMemoryError {
 	PtraceAttachError(#[from] PtraceAttachError),
 
 	#[error("could not write to memory file")]
-	Io(#[from] std::io::Error)
-	
-	// TODO
-	// #[error("attempted to write to memory range that is not (wholly) mapped")]
-	// RangeNotMapped
+	Io(#[from] std::io::Error) /* TODO
+	                            * #[error("attempted to write to memory range that is not (wholly) mapped")]
+	                            * RangeNotMapped */
 }
 
 
@@ -68,7 +69,7 @@ impl ProcessContext {
 
 		let mem_path = Self::mem_path(pid);
 		let mem_rw = OpenOptions::new()
-			.read(true)	
+			.read(true)
 			.write(true)
 			.open(mem_path)
 			.map_err(|err| ProcessContextError::MemoryFileIo(err))?;
@@ -153,13 +154,13 @@ impl ProcessContext {
 	/// * read range must be mapped
 	pub unsafe fn read_memory(
 		&mut self,
-		offset: usize,
+		offset: OffsetType,
 		buffer: &mut [u8]
 	) -> Result<(), ReadMemoryError> {
 		self.ptrace_attach()?;
 
 		// TODO: Check memory range is mapped
-		self.mem_rw.seek(SeekFrom::Start(offset as u64))?;
+		self.mem_rw.seek(SeekFrom::Start(offset.get() as u64))?;
 		self.mem_rw.read_exact(buffer)?;
 
 		self.ptrace_detach()?;
@@ -171,13 +172,13 @@ impl ProcessContext {
 	/// * written range must be mapped
 	pub unsafe fn write_memory(
 		&mut self,
-		offset: usize,
+		offset: OffsetType,
 		data: &[u8]
 	) -> Result<(), WriteMemoryError> {
 		self.ptrace_attach_exclusive()?;
 
 		// TODO: Check memory range is mapped
-		self.mem_rw.seek(SeekFrom::Start(offset as u64))?;
+		self.mem_rw.seek(SeekFrom::Start(offset.get() as u64))?;
 		self.mem_rw.write_all(data)?;
 
 		self.ptrace_detach()?;

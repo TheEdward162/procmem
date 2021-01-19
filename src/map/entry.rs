@@ -68,7 +68,7 @@ impl std::fmt::Display for EntryType {
 #[derive(Debug, Clone)]
 pub struct MemoryMapEntry {
 	/// Address range of this entry.
-	pub address_range: [usize; 2],
+	pub address_range: [crate::util::OffsetType; 2],
 	/// Permissions of this entry.
 	pub permissions: MemoryMapPermissions,
 	pub entry_type: EntryType
@@ -82,7 +82,7 @@ impl std::fmt::Display for MemoryMapEntry {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		write!(
 			f,
-			"{:x}-{:x} {} {}",
+			"{}-{} {} {}",
 			self.address_range[0], self.address_range[1], self.permissions, self.entry_type
 		)
 	}
@@ -223,7 +223,7 @@ impl std::str::FromStr for MemoryMapEntry {
 			.unwrap();
 
 		Ok(MemoryMapEntry {
-			address_range: [from, to],
+			address_range: [from.into(), to.into()],
 			permissions,
 			entry_type
 		})
