@@ -74,7 +74,7 @@ impl Candidate {
 	}
 
 	pub fn end_offset(&self) -> OffsetType {
-		(self.offset.get() + self.position).into()
+		self.offset.saturating_add(self.position)
 	}
 }
 impl std::cmp::PartialOrd for Candidate {
