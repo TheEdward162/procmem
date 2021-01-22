@@ -71,12 +71,13 @@ pub enum MemoryPageType {
 	Heap,
 	/// Anonymous mapping.
 	Anon,
-	/// File-backed mapping
+	/// Like `File(path)` but the path is the original executable of the process.
+	ExeFile(PathBuf),
+	/// File-backed mapping.
 	File(PathBuf),
 
-	// TODO: SelfFile or something similar
-
 	// TODO: Research platforms more
+	// Deleted
 	// Vvar,
 	// Vdso,
 }
@@ -87,6 +88,7 @@ impl std::fmt::Display for MemoryPageType {
 			MemoryPageType::Stack => write!(f, "[stack]"),
 			MemoryPageType::Heap => write!(f, "[heap]"),
 			MemoryPageType::Anon => write!(f, ""),
+			MemoryPageType::ExeFile(path) => write!(f, "{} (self)", path.display()),
 			MemoryPageType::File(path) => write!(f, "{}", path.display()),
 		}
 	}
@@ -96,14 +98,15 @@ impl std::fmt::Display for MemoryPageType {
 pub struct MemoryPage {
 	pub address_range: [OffsetType; 2],
 	pub permissions: MemoryPagePermissions,
+	pub offset: usize,
 	pub page_type: MemoryPageType
 }
 impl std::fmt::Display for MemoryPage {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		write!(
 			f,
-			"{}-{} {} {}",
-			self.address_range[0], self.address_range[1], self.permissions, self.page_type
+			"{}-{} {} {} {}",
+			self.address_range[0], self.address_range[1], self.permissions, self.offset, self.page_type
 		)
 	}
 }

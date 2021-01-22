@@ -5,27 +5,40 @@ use crate::common::OffsetType;
 use super::ScannerCandidate;
 use super::predicate::{ScannerPredicate, UpdateCandidateResult, PartialScannerPredicate};
 
-/// Scans for a sequence of bytes in the memory.
-pub struct SequentialScanner<P: ScannerPredicate> {
+/// Scans a stream of bytes for values matching the predicate.
+pub struct StreamScanner<P: ScannerPredicate> {
 	predicate: P,
 	candidates: Vec<ScannerCandidate>
 }
-impl<P: ScannerPredicate> SequentialScanner<P> {
+impl<P: ScannerPredicate> StreamScanner<P> {
 	pub fn new(predicate: P) -> Self {
-		SequentialScanner {
+		StreamScanner {
 			predicate,
 			candidates: Vec::new()
 		}
 	}
 
-	pub fn scan(
+	/// Resets this scanner.
+	///
+	/// For normal scans, this has no effect.
+	/// For partial scans, this clears existing progress from previous partial scans.
+	pub fn reset(&mut self) {
+		self.candidates.clear()
+	}
+
+	/// Runs the scanner on a stream.
+	///
+	/// Does not detect across multiple calls.
+	pub fn scan_once(
 		&mut self,
-		sequence_offset: OffsetType,
-		sequence: impl Iterator<Item = u8>,
+		offset: OffsetType,
+		stream: impl Iterator<Item = u8>,
 		mut callback: impl FnMut(OffsetType, NonZeroUsize) -> bool
 	) {
-		let mut offset = sequence_offset;
-		for byte in sequence {
+		self.reset();
+
+		let mut offset = offset;
+		for byte in stream {
 			let cont = self.on_byte(
 				offset,
 				byte,
@@ -93,37 +106,114 @@ impl<P: ScannerPredicate> SequentialScanner<P> {
 		true
 	}
 }
-/*
-impl<P: PartialScannerPredicate> SequentialScanner<P> {
+impl<P: PartialScannerPredicate> StreamScanner<P> {
+	/// Runs the scanner on the sequence, preserving partial candidates.
+	///
+	/// Running this scan multiple times on chunks of a contiguous sequence will
+	/// find matches the same way as if it was run on the whole sequence using [`scan`](StreamScanner::scan)
 	pub fn scan_partial(
 		&mut self,
 		sequence_offset: OffsetType,
-		sequence: impl Iterator<Item = u8>,
-		callback: impl FnMut(OffsetType, NonZeroUsize) -> bool
+		mut sequence: impl Iterator<Item = u8>,
+		mut callback: impl FnMut(OffsetType, NonZeroUsize) -> bool
 	) {
+		let mut offset = sequence_offset;
+		
+		// unroll the first iteration to run `on_start` here.
+		if !sequence.next().map(|first_byte| {
+			self.on_start(offset, first_byte);
 
+			let cont = self.on_byte(
+				offset,
+				first_byte,
+				&mut callback
+			);
+			if !cont {
+				return false;
+			}
+			offset = offset.saturating_add(1);
+
+			true
+		}).unwrap_or(false) {
+			return;
+		}
+
+		for byte in sequence {
+			let cont = self.on_byte(
+				offset,
+				byte,
+				&mut callback
+			);
+
+			if !cont {
+				break;
+			}
+			offset = offset.saturating_add(1);
+		}
+
+		self.on_end();
 	}
 	
-	pub fn merge(
+	/// Merges the partial candidates from other scanner into self.
+	///
+	/// This has the same effect as replaying the same scans that were run on `other` on self.
+	///
+	/// `other` is not modified. To clear the old matches from it, run [`reset`](StreamScanner::reset).
+	pub fn merge_mut(
 		&mut self,
-		other: Self,
+		other: &Self,
 		callback: impl FnMut(OffsetType, NonZeroUsize) -> bool
 	) {
-
+		todo!()
 	}
 
 	fn on_start(&mut self, offset: OffsetType, byte: u8) {
-		for condition in self.predicate.
+		self.candidates.extend(
+			self.predicate.try_start_partial_candidates(offset, byte)
+		);
 	}
 
 	fn on_end(&mut self) {
-
+		dbg!(&self.candidates);
+		// TODO: Probably nothing to do here
 	}
 }
-*/
+
+// fn on_page_end(&mut self, offset: OffsetType) {
+// 	// TODO: Oh unstable, why must you hurt me so
+// 	// self.candidates.drain_filter(filter)
+
+// 	// remove all candidates that aren't partial and don't end at the page boundary
+// 	let mut i = 0;
+// 	while i < self.candidates.len() {
+// 		let remove = {
+// 			let mut candidate = &mut self.candidates[i];
+
+// 			// don't remove partial candidates
+// 			if candidate.partial_offset.is_some() {
+// 				false
+// 			} else {
+// 				if candidate.end_offset() == offset {
+// 					candidate.partial_offset = Some(candidate.offset);
+// 					// don't remove, ends at page boundary
+// 					false
+// 				} else {
+// 					// remove all other candidates
+// 					true
+// 				}
+// 			}
+// 		};
+
+// 		if remove {
+// 			self.candidates.remove(i);
+// 		} else {
+// 			i += 1;
+// 		}
+// 	}
+// }
 
 /*
-pub fn merge<B: AsRef<[T]>>(&mut self, other: ArrayFinder<T, B>) {
+	pub fn merge<B: AsRef<[T]>>(&mut self, other: ArrayFinder<T, B>) {
 		debug_assert_eq!(self.target.as_ref(), other.target.as_ref());
 		debug_assert!(self.candidates.as_slice().windows(2).all(|w| {
 			w[0].partial_cmp(&w[1])
@@ -195,47 +285,6 @@ pub fn merge<B: AsRef<[T]>>(&mut self, other: ArrayFinder<T, B>) {
 			self.found.dedup();
 		}
 	}
-
-fn on_page_start(&mut self, offset: OffsetType, element: T) {
-		for (i, t) in self.target.as_ref().iter().enumerate().skip(1) {
-			if t == &element {
-				self.candidates.push(Candidate::partial(offset, i));
-			}
-		}
-	}
-
-	fn on_page_end(&mut self, offset: OffsetType) {
-		// TODO: Oh unstable, why must you hurt me so
-		// self.candidates.drain_filter(filter)
-
-		// remove all candidates that aren't partial and don't end at the page boundary
-		let mut i = 0;
-		while i < self.candidates.len() {
-			let remove = {
-				let mut candidate = &mut self.candidates[i];
-
-				// don't remove partial candidates
-				if candidate.partial_offset.is_some() {
-					false
-				} else {
-					if candidate.end_offset() == offset {
-						candidate.partial_offset = Some(candidate.offset);
-						// don't remove, ends at page boundary
-						false
-					} else {
-						// remove all other candidates
-						true
-					}
-				}
-			};
-
-			if remove {
-				self.candidates.remove(i);
-			} else {
-				i += 1;
-			}
-		}
-	}
 */
 
 #[cfg(test)]
@@ -244,7 +293,7 @@ mod test {
 	use std::convert::TryInto;
 
     use crate::scanner::predicate::value::ValuePredicate;
-	use super::SequentialScanner;
+	use super::StreamScanner;
 	use crate::common::AsRawBytes;
 
 	#[test]
@@ -252,10 +301,10 @@ mod test {
 		let data = b"Hello There";
 
 		let predicate = ValuePredicate::new(data, true);
-		let mut scanner = SequentialScanner::new(predicate);
+		let mut scanner = StreamScanner::new(predicate);
 		let mut found = Vec::new();
 
-		scanner.scan(
+		scanner.scan_once(
 			1.into(),
 			data.iter().copied(),
 			|offset, len| {
@@ -278,10 +327,10 @@ mod test {
 		let data = [2u64, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 2];
 
 		let predicate = ValuePredicate::new([1u64, 0, 1, 0], true);
-		let mut scanner = SequentialScanner::new(predicate);
+		let mut scanner = StreamScanner::new(predicate);
 		let mut found = Vec::new();
 
-		scanner.scan(
+		scanner.scan_once(
 			8.into(),
 			data.as_raw_bytes().iter().copied(),
 			|offset, len| {
@@ -298,6 +347,51 @@ mod test {
 				(32.into(), 32.try_into().unwrap()),
 				(72.into(), 32.try_into().unwrap())
 			]
+		);
+	}
+
+	#[test]
+	fn test_scan_scan_partial_equal() {
+		let data = [3u8, 4, 3, 4, 5, 6];
+		let predicate = ValuePredicate::new([3u8, 4], true);
+		
+		let mut scanner = StreamScanner::new(predicate);
+
+		let mut found_scan = Vec::new();
+		let mut found_scan_partial = Vec::new();
+
+		scanner.scan_once(
+			1.into(),
+			data.iter().copied(),
+			|offset, len| {
+				found_scan.push((offset, len));
+
+				true
+			}
+		);
+
+		scanner.scan_partial(
+			4.into(),
+			data[3 ..].iter().copied(),
+			|offset, len| {
+				found_scan_partial.push((offset, len));
+
+				true
+			}
+		);
+		scanner.scan_partial(
+			1.into(),
+			data[.. 3].iter().copied(),
+			|offset, len| {
+				found_scan_partial.push((offset, len));
+
+				true
+			}
+		);
+		
+		assert_eq!(
+			found_scan,
+			found_scan_partial
 		);
 	}
 

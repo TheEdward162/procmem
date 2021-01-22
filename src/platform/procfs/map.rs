@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::io::Read;
 
 use thiserror::Error;
@@ -35,10 +35,15 @@ impl ProcfsMemoryMap {
 
 		let mut file = OpenOptions::new().read(true).open(path)?;
 		let mut buffer = String::new();
+		// TODO: Lets hope there not invalid unicode in the file paths
 		file.read_to_string(&mut buffer)?;
 
+		let exe_path = fs::read_link(
+			format!("/proc/{}/exe", pid)
+		).ok().and_then(|p| p.into_os_string().into_string().ok());
+
 		for line in buffer.lines() {
-			let page = Self::parse_map_line(line)?;
+			let page = Self::parse_map_line(line, exe_path.as_deref())?;
 
 			offset_map.insert(page.address_range[0], pages.len());
 			pages.push(page);
@@ -93,20 +98,32 @@ impl ProcfsMemoryMap {
 		)
 	}
 
-	fn parse_page_type(string: &str) -> MemoryPageType {
-		 match string.trim() {
+	fn parse_page_type(
+		string: &str,
+		exe_path: Option<&str>
+	) -> MemoryPageType {
+		match string.trim() {
 			"[stack]" => MemoryPageType::Stack,
 			"[heap]" => MemoryPageType::Heap,
 			"" => MemoryPageType::Anon,
-			// TODO
-			"[vvar]" => MemoryPageType::Unknown,
-			"[vdso]" => MemoryPageType::Unknown,
+
+			// [vvar] [vdso]
+			s if s.starts_with('[') && s.ends_with(']') => MemoryPageType::Unknown,
+			s if s.ends_with("(deleted)") => MemoryPageType::Unknown,
 			
-			p => MemoryPageType::File(std::path::PathBuf::from(p)),
+			path => {
+				match exe_path {
+					Some(exe) if path == exe => MemoryPageType::ExeFile(std::path::PathBuf::from(path)),
+					_ => MemoryPageType::File(std::path::PathBuf::from(path))
+				}
+			}
 		}
 	}
 
-	fn parse_map_line(line: &str) -> Result<MemoryPage, MemoryPageParseError> {
+	fn parse_map_line(
+		line: &str,
+		exe_path: Option<&str>
+	) -> Result<MemoryPage, MemoryPageParseError> {
 		let mut split = line.splitn(6, " ");
 
 		let mut range_split = split.next()
@@ -124,17 +141,19 @@ impl ProcfsMemoryMap {
 			split.next().ok_or(MemoryPageParseError::InvalidPerms)?
 		)?;
 
-		split.next().ok_or(MemoryPageParseError::InvalidOffset)?;
 		split.next().ok_or(MemoryPageParseError::InvalidDevnode)?;
 		split.next().ok_or(MemoryPageParseError::InvalidInode)?;
+		let offset = split.next().ok_or(MemoryPageParseError::InvalidOffset)?.parse::<usize>()?;
 
 		let page_type = Self::parse_page_type(
-			split.next().ok_or(MemoryPageParseError::InvalidEntry)?
+			split.next().ok_or(MemoryPageParseError::InvalidEntry)?,
+			exe_path
 		);
 
 		Ok(MemoryPage {
 			address_range: [from.into(), to.into()],
 			permissions,
+			offset,
 			page_type
 		})
 	}
@@ -194,12 +213,13 @@ mod test {
 	fn test_procfs_maps_parse() {
 		let line = "1f0-20f rw-p 0 00:00 0 [heap]";
 
-		let value = ProcfsMemoryMap::parse_map_line(line).unwrap();
+		let value = ProcfsMemoryMap::parse_map_line(line, None).unwrap();
 		assert_eq!(
 			value,
 			MemoryPage {
 				address_range: [496.into(), 527.into()],
 				permissions: MemoryPagePermissions::new(true, true, false, false),
+				offset: 0,
 				page_type: MemoryPageType::Heap
 			}
 		);

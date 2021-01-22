@@ -1,7 +1,11 @@
+use std::num::NonZeroUsize;
+
 use crate::common::{OffsetType, AsRawBytes};
 
 use crate::scanner::predicate::{ScannerPredicate, UpdateCandidateResult};
 use crate::scanner::candidate::ScannerCandidate;
+
+use super::PartialScannerPredicate;
 
 pub struct ValuePredicate<T: AsRawBytes> {
 	value: T,
@@ -14,13 +18,17 @@ impl<T: AsRawBytes> ValuePredicate<T> {
 			aligned
 		}
 	}
+
+	fn offset_aligned(&self, offset: OffsetType) -> bool {
+		!self.aligned || (offset.get() % T::align_of()) == 0
+	}
 }
 impl<T: AsRawBytes> ScannerPredicate for ValuePredicate<T> {
 	fn try_start_candidate(&self, offset: OffsetType, byte: u8) -> Option<ScannerCandidate> {
-		if !self.aligned || (offset.get() % T::align_of()) == 0 {
+		if self.offset_aligned(offset) {
 			if self.value.as_raw_bytes()[0] == byte {
 				return Some(
-					ScannerCandidate::new(offset)
+					ScannerCandidate::normal(offset)
 				);
 			}
 		}
@@ -41,6 +49,38 @@ impl<T: AsRawBytes> ScannerPredicate for ValuePredicate<T> {
 		}
 
 		UpdateCandidateResult::Advance
+	}
+}
+impl<T: AsRawBytes> PartialScannerPredicate for ValuePredicate<T> {
+	fn try_start_partial_candidates(&self, offset: OffsetType, byte: u8) -> Vec<ScannerCandidate> {
+		let mut candidates = Vec::new();
+		
+		for (i, target_byte) in self.value.as_raw_bytes().iter().copied().enumerate().skip(1).rev() {
+			if byte != target_byte {
+				continue;
+			}
+			
+			let potential_start_offset = match offset.get().checked_sub(i) {
+				// skip this candidate if it would start at a non-positive offset
+				// even though starting at offset 1 is also pretty unreal, it is not against our invariants
+				None => continue,
+				Some(p) if p == 0 => continue,
+				Some(p) => p.into()
+			};
+
+			if !self.offset_aligned(potential_start_offset) {
+				continue;
+			}
+
+			candidates.push(
+				ScannerCandidate::partial(
+					offset,
+					NonZeroUsize::new(i).unwrap()
+				)
+			);
+		}
+
+		candidates
 	}
 }
 
@@ -68,7 +108,7 @@ mod test {
 		// Works correctly
 		assert_eq!(
 			predicate.try_start_candidate(100.into(), data[0]),
-			Some(ScannerCandidate::new(100.into()))
+			Some(ScannerCandidate::normal(100.into()))
 		);
 		// Rejects unaligned
 		assert_eq!(
@@ -100,9 +140,9 @@ mod test {
 		// Works correctly
 		assert_eq!(
 			predicate.try_start_candidate(100.into(), data[0]),
-			Some(ScannerCandidate::new(100.into()))
+			Some(ScannerCandidate::normal(100.into()))
 		);
-		let mut candidate = ScannerCandidate::new(100.into());
+		let mut candidate = ScannerCandidate::normal(100.into());
 		
 		// valid continuation
 		assert_eq!(

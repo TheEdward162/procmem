@@ -20,10 +20,13 @@ impl OffsetType {
 	}
 
 	pub fn try_new(offset: usize) -> Option<Self> {
-		NonZeroUsize::new(offset).map(Self)
+		match NonZeroUsize::new(offset) {
+			None => None,
+			Some(n) => Some(Self(n))
+		}
 	}
 
-	pub fn get(&self) -> usize {
+	pub const fn get(&self) -> usize {
 		self.0.get()
 	}
 

@@ -36,10 +36,8 @@ pub trait ScannerPredicate {
 ///
 /// One main usecase of this is running the scanner multi-threaded.
 pub trait PartialScannerPredicate: ScannerPredicate {
-	type PartialCandidateIter: Iterator<Item = ScannerCandidate>;
-
 	/// Decides whether the currently read byte is a start of any partial candidates.
 	///
 	/// This is only called at the very first byte of each scanned sequence.
-	fn try_start_partial_candidates(&self, offset: OffsetType, byte: u8) -> Self::PartialCandidateIter;
+	fn try_start_partial_candidates(&self, offset: OffsetType, byte: u8) -> Vec<ScannerCandidate>;
 }

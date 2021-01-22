@@ -1,4 +1,4 @@
-use procmem::{platform::procfs::{map::ProcfsMemoryMap, access::ProcfsAccess}, scanner::{predicate::value::ValuePredicate, sequential::SequentialScanner}};
+use procmem::{platform::procfs::{map::ProcfsMemoryMap, access::ProcfsAccess}, scanner::{predicate::value::ValuePredicate, stream::StreamScanner}};
 use procmem::memory::{access::MemoryAccess, map::{MemoryMap, MemoryPageType}};
 
 fn main() {
@@ -18,27 +18,27 @@ fn main() {
 	eprintln!("pid: {}", pid);
 	eprintln!("needle: {}", needle);
 
-	let memory_map = ProcfsMemoryMap::load(
-		pid
-	).expect("could not read memory map");
+	let predicate = ValuePredicate::new(needle, true);
+	let mut scanner = StreamScanner::new(predicate);
 
 	let mut memory_access = ProcfsAccess::open(
 		pid
 	).expect("could not open process memory");
+	memory_access.lock().expect("could not lock memory access");
 
-	let predicate = ValuePredicate::new(needle, true);
-	let mut scanner = SequentialScanner::new(predicate);
+	let memory_map = ProcfsMemoryMap::load(
+		pid
+	).expect("could not read memory map");
 
 	let pages = memory_map.pages().iter().filter(
 		|page| page.permissions.read() && match page.page_type {
-			MemoryPageType::File(_) => true,
+			MemoryPageType::ExeFile(_) => true,
 			_ => false
 		}
 	);
 
 	let mut page_buffer = Vec::new();
 	for page in pages {
-		// memory_access.lock().expect("could not lock memory access");
 		page_buffer.resize(page.address_range[1].get() - page.address_range[0].get(), 0);
 		eprintln!("Reading page {}", page);
 		unsafe {
@@ -54,16 +54,15 @@ fn main() {
 				}
 			}
 		}
-		// memory_access.unlock().expect("could not unlock memory access");
 
-		scanner.scan(
+		scanner.scan_once(
 			page.address_range[0],
 			page_buffer.iter().copied(),
 			|offset, len| {
 				let relative_offset = offset.get() - page.address_range[0].get();
 				
 				println!(
-					"[{}]: {}",
+					"[0x{}]: {}",
 					offset,
 					std::str::from_utf8(
 						&page_buffer[
@@ -76,4 +75,5 @@ fn main() {
 			}
 		);
 	}
+	memory_access.unlock().expect("could not unlock memory access");
 }

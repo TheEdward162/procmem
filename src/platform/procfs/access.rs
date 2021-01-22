@@ -54,11 +54,13 @@ impl ProcfsAccess {
 			)
 		}
 
-		if libc::waitpid(self.pid, std::ptr::null_mut(), 0) != 0 {
+		let waitpid_res = libc::waitpid(self.pid, std::ptr::null_mut(), 0);
+		if waitpid_res == -1 {
 			return Err(
 				LockError::WaitpidError(std::io::Error::last_os_error())
 			)
 		}
+		debug_assert_eq!(waitpid_res, self.pid);
 
 		Ok(())
 	}

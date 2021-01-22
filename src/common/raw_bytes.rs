@@ -2,7 +2,11 @@
 ///
 /// Most notably it is UB to read padding bytes, so this trait cannot just be
 /// implemented for any type.
-pub trait AsRawBytes {
+///
+/// ## Safety
+/// * The type memory representation must be safe to read in its entirety - i.e. no padding bytes
+/// * The types size must be a multiple of its alignment - so that `[T]` can also implement `AsRawBytes`
+pub unsafe trait AsRawBytes {
 	/// Returns a view of the memory covered by `self` as raw bytes.
 	fn as_raw_bytes(&self) -> &[u8];
 
@@ -16,7 +20,7 @@ macro_rules! impl_as_raw_bytes {
 	(
 		$raw_type: ty
 	) => {
-		impl AsRawBytes for $raw_type {
+		unsafe impl AsRawBytes for $raw_type {
 			fn as_raw_bytes(&self) -> &[u8] {
 				unsafe {
 					std::slice::from_raw_parts(
@@ -33,16 +37,17 @@ macro_rules! impl_as_raw_bytes {
 	};
 
 	(
-		__array: $raw_type: ty, $($num: literal),+ $(,)?
+		Array:
+		$($num: literal),+ $(,)?
 	) => {
 		$(
-			impl AsRawBytes for [$raw_type; $num] {
+			unsafe impl<T: AsRawBytes> AsRawBytes for [T; $num] {
 				fn as_raw_bytes(&self) -> &[u8] {
 					self.as_ref().as_raw_bytes()
 				}
 
 				fn align_of() -> usize {
-					std::mem::align_of::<$raw_type>()
+					std::mem::align_of::<T>()
 				}
 			}
 		)+
@@ -55,7 +60,7 @@ macro_rules! impl_as_raw_bytes {
 		),+ $(,)?
 	) => {
 		$(
-			impl<T: AsRawBytes> AsRawBytes for $($toks)+ {
+			unsafe impl<T: AsRawBytes> AsRawBytes for $($toks)+ {
 				fn as_raw_bytes(&self) -> &[u8] {
 					(**self).as_raw_bytes()
 				}
@@ -74,7 +79,6 @@ macro_rules! impl_as_raw_bytes {
 	) => {
 		$(
 			impl_as_raw_bytes!($raw_type);
-			impl_as_raw_bytes!(__array: $raw_type, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
 		)+
 	};
 }
@@ -82,7 +86,7 @@ impl_as_raw_bytes!(
 	u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize,
 	f32, f64
 );
-impl<T: AsRawBytes> AsRawBytes for &T {
+unsafe impl<T: AsRawBytes> AsRawBytes for &T {
 	fn as_raw_bytes(&self) -> &[u8] {
 		(*self).as_raw_bytes()
 	}
@@ -91,8 +95,10 @@ impl<T: AsRawBytes> AsRawBytes for &T {
 		std::mem::align_of::<T>()
 	}
 }
-impl<T: AsRawBytes> AsRawBytes for [T] {
+unsafe impl<T: AsRawBytes> AsRawBytes for [T] {
 	fn as_raw_bytes(&self) -> &[u8] {
+		// This is safe because `T` must implement `AsRawBytes`
+		// and thus must be safe for reinterpreting as raw bytes.
 		unsafe {
 			std::slice::from_raw_parts(
 				self.as_ptr() as *const u8,
@@ -116,7 +122,7 @@ impl_as_raw_bytes!(
 	{ std::sync::Arc<[T]> },
 );
 
-impl AsRawBytes for str {
+unsafe impl AsRawBytes for str {
 	fn as_raw_bytes(&self) -> &[u8] {
 		self.as_bytes().as_raw_bytes()
 	}
@@ -125,7 +131,7 @@ impl AsRawBytes for str {
 		std::mem::align_of::<u8>()
 	}
 }
-impl AsRawBytes for String {
+unsafe impl AsRawBytes for String {
 	fn as_raw_bytes(&self) -> &[u8] {
 		self.as_bytes().as_raw_bytes()
 	}
@@ -134,6 +140,10 @@ impl AsRawBytes for String {
 		std::mem::align_of::<u8>()
 	}
 }
+impl_as_raw_bytes!(
+	Array:
+	1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+);
 
 #[cfg(test)]
 mod test {
