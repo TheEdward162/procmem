@@ -61,7 +61,7 @@ impl ScannerCandidate {
 
 	/// Offset where the definitely matched candidate starts.
 	///
-	/// This differs from [`offset`](ScannerCadidate::offset) only for partial candidates. 
+	/// This differs from [`offset`](ScannerCandidate::offset) only for partial candidates. 
 	pub fn start_offset(&self) -> OffsetType {
 		self.start_offset.unwrap_or(self.offset)
 	}
@@ -109,7 +109,7 @@ impl ScannerCandidate {
 		Ok(())
 	}
 
-	/// Returns an adapted iterator that will merge all consecutive
+	/// Returns an adapted iterator that will merge all consecutive candidates in the iterator using [`try_merge_mut`](ScannerCandidate::try_merge_mut).
 	pub fn merge_sorted(iter: impl Iterator<Item = Self>) -> impl Iterator<Item = Self> {
 		AccFilter::new(iter, |acc, curr| {
 			match acc {

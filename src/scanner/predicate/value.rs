@@ -7,11 +7,17 @@ use crate::scanner::candidate::ScannerCandidate;
 
 use super::PartialScannerPredicate;
 
+/// Predicate scanning for a concrete value in memory.
+///
+/// The value may be anything but is constrained to `AsRawBytes` because it needs to be accessed as raw bytes safely.
 pub struct ValuePredicate<T: AsRawBytes> {
 	value: T,
 	aligned: bool
 }
 impl<T: AsRawBytes> ValuePredicate<T> {
+	/// Creates a new predicate.
+	///
+	/// If `aligned` is true then candidates are only generated at offsets that are divisible by [`T::align_of`](AsRawBytes::align_of)
 	pub fn new(value: T, aligned: bool) -> Self {
 		ValuePredicate {
 			value,

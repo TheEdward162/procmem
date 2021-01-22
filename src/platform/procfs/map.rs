@@ -113,7 +113,7 @@ impl ProcfsMemoryMap {
 			
 			path => {
 				match exe_path {
-					Some(exe) if path == exe => MemoryPageType::ExeFile(std::path::PathBuf::from(path)),
+					Some(exe) if path == exe => MemoryPageType::ProcessExecutable(std::path::PathBuf::from(path)),
 					_ => MemoryPageType::File(std::path::PathBuf::from(path))
 				}
 			}
