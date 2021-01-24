@@ -12,10 +12,10 @@ fn main() {
 	let (pid, needle) = {
 		let mut it = std::env::args().skip(1);
 
-		let pid: libc::pid_t = it.next().and_then(
+		let pid: i32 = it.next().and_then(
 			|s| s.parse().ok()
 		).unwrap_or_else(
-			|| unsafe { libc::getpid() }
+			|| std::process::id() as i32
 		);
 
 		let needle = it.next().unwrap_or_else(|| "\x7FELF".to_string());

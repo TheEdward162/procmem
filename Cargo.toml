@@ -1,2 +1,2 @@
 [workspace]
-members = ["procmem_access", "procmem_scan"]
+members = ["procmem_access", "procmem_scan", "procmem_examples"]

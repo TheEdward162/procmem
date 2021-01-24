@@ -1,0 +1,10 @@
+[package]
+name = "procmem_examples"
+version = "0.1.0"
+authors = ["TheEdward162 <thedward162@gmail.com>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+procmem_access = { path = "../procmem_access" }
+procmem_scan = { path = "../procmem_scan" }
