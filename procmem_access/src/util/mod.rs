@@ -1,4 +1,5 @@
-pub mod merge;
 pub mod acc_filter;
+pub mod merge;
 
-pub use {merge::MergeIter, acc_filter::AccFilter};
+pub use acc_filter::AccFilter;
+pub use merge::MergeIter;

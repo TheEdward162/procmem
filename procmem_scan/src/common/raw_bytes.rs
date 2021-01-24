@@ -64,14 +64,14 @@ macro_rules! impl_as_raw_bytes {
 				fn as_raw_bytes(&self) -> &[u8] {
 					(**self).as_raw_bytes()
 				}
-			
+
 				fn align_of() -> usize {
 					std::mem::align_of::<T>()
 				}
 			}
 		)+
 	};
-	
+
 	(
 		$(
 			$raw_type: ty
@@ -82,10 +82,7 @@ macro_rules! impl_as_raw_bytes {
 		)+
 	};
 }
-impl_as_raw_bytes!(
-	u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize,
-	f32, f64
-);
+impl_as_raw_bytes!(u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize, f32, f64);
 unsafe impl<T: AsRawBytes> AsRawBytes for &T {
 	fn as_raw_bytes(&self) -> &[u8] {
 		(*self).as_raw_bytes()
@@ -153,20 +150,14 @@ mod test {
 	fn test_as_raw_bytes() {
 		let v = 1u16;
 
-		assert_eq!(
-			v.as_raw_bytes(),
-			v.to_ne_bytes()
-		);
+		assert_eq!(v.as_raw_bytes(), v.to_ne_bytes());
 	}
 
 	#[test]
 	fn test_as_raw_bytes_vec() {
 		let v = vec![std::u16::MAX; 2];
 
-		assert_eq!(
-			v.as_raw_bytes(),
-			&[0xFF, 0xFF, 0xFF, 0xFF]
-		);
+		assert_eq!(v.as_raw_bytes(), &[0xFF, 0xFF, 0xFF, 0xFF]);
 	}
 
 	#[test]
@@ -179,9 +170,6 @@ mod test {
 			[f[0], f[1], f[2], f[3], s[0], s[1], s[2], s[3]]
 		};
 
-		assert_eq!(
-			v.as_raw_bytes(),
-			&e
-		);
+		assert_eq!(v.as_raw_bytes(), &e);
 	}
 }

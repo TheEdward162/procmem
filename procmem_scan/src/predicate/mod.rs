@@ -16,7 +16,7 @@ pub enum UpdateCandidateResult {
 	Resolve
 }
 
-/// Scanner predicate is an interface which the scanner asks where 
+/// Scanner predicate is an interface which the scanner asks where
 /// to create, update, delete and resolve candidates.
 pub trait ScannerPredicate {
 	/// Decides whether the currently read byte is a start of a candidate.
@@ -25,7 +25,12 @@ pub trait ScannerPredicate {
 	/// Decides whether the currently read byte is a valid continuation of the candidate.
 	///
 	/// This is only called of `offset == candidate.end_offset() + 1`.
-	fn update_candidate(&self, offset: OffsetType, byte: u8, candidate: &ScannerCandidate) -> UpdateCandidateResult;
+	fn update_candidate(
+		&self,
+		offset: OffsetType,
+		byte: u8,
+		candidate: &ScannerCandidate
+	) -> UpdateCandidateResult;
 }
 
 /// Partial scanner predicate builds on scanner predicate and extends the interface with

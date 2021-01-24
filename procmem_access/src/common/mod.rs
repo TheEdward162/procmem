@@ -29,11 +29,7 @@ impl OffsetType {
 
 	pub const fn saturating_add(&self, rhs: usize) -> OffsetType {
 		// Safe because we use saturating addition on one positive and non-negative number
-		let value = unsafe {
-			NonZeroUsize::new_unchecked(
-				self.0.get().saturating_add(rhs)
-			)
-		};
+		let value = unsafe { NonZeroUsize::new_unchecked(self.0.get().saturating_add(rhs)) };
 
 		OffsetType(value)
 	}

@@ -23,7 +23,7 @@ pub enum UnlockError {
 	#[error("process is not locked")]
 	NotLocked,
 	#[error("ptrace(PTRACE_DETACH) failed")]
-	PtraceError(std::io::Error),
+	PtraceError(std::io::Error)
 }
 
 #[derive(Debug, Error)]
@@ -31,7 +31,7 @@ pub enum ReadError {
 	#[error("not permitted to read from this range")]
 	NotPermitted,
 	#[error("could not perform memory read")]
-	Io(#[from] std::io::Error),
+	Io(#[from] std::io::Error)
 }
 
 #[derive(Debug, Error)]
@@ -39,7 +39,7 @@ pub enum WriteError {
 	#[error("not permitted to write to this range")]
 	NotPermitted,
 	#[error("could not perform memory write")]
-	Io(#[from] std::io::Error),
+	Io(#[from] std::io::Error)
 }
 
 /// Trait implemented on abstractions over accessing process memory.

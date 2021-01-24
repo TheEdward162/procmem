@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
-use crate::common::OffsetType;
-use crate::util::AccFilter;
+use crate::{common::OffsetType, util::AccFilter};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct MemoryPagePermissions {
@@ -13,22 +12,12 @@ impl MemoryPagePermissions {
 	pub const MASK_EXEC: u8 = 1 << 2;
 	pub const MASK_SHARE: u8 = 1 << 3;
 
-	pub const fn new(
-		read: bool,
-		write: bool,
-		exec: bool,
-		share: bool
-	) -> Self {
+	pub const fn new(read: bool, write: bool, exec: bool, share: bool) -> Self {
 		MemoryPagePermissions {
-			bits: (
-				read as u8 * Self::MASK_READ
-			) | (
-				write as u8 * Self::MASK_WRITE
-			) | (
-				exec as u8 * Self::MASK_EXEC
-			) | (
-				share as u8 * Self::MASK_SHARE
-			)
+			bits: (read as u8 * Self::MASK_READ)
+				| (write as u8 * Self::MASK_WRITE)
+				| (exec as u8 * Self::MASK_EXEC)
+				| (share as u8 * Self::MASK_SHARE)
 		}
 	}
 
@@ -84,8 +73,7 @@ pub enum MemoryPageType {
 	/// Like `File(path)` but the path is the original executable of the process.
 	ProcessExecutable(PathBuf),
 	/// File-backed mapping that is different from the process executable.
-	File(PathBuf),
-
+	File(PathBuf)
 	// TODO: Research platforms more
 	// Deleted
 	// Vvar,
@@ -99,7 +87,7 @@ impl std::fmt::Display for MemoryPageType {
 			MemoryPageType::Heap => write!(f, "[heap]"),
 			MemoryPageType::Anon => write!(f, ""),
 			MemoryPageType::ProcessExecutable(path) => write!(f, "{} (self)", path.display()),
-			MemoryPageType::File(path) => write!(f, "{}", path.display()),
+			MemoryPageType::File(path) => write!(f, "{}", path.display())
 		}
 	}
 }
@@ -113,9 +101,11 @@ pub struct MemoryPage {
 }
 impl MemoryPage {
 	pub fn try_merge_mut(&mut self, other: Self) -> Result<(), Self> {
-		if self.address_range[1].get() < other.address_range[0].get() || other.address_range[1].get() < self.address_range[0].get() {
-			return Err(other);
-		} 
+		if self.address_range[1].get() < other.address_range[0].get()
+			|| other.address_range[1].get() < self.address_range[0].get()
+		{
+			return Err(other)
+		}
 
 		self.address_range = [
 			self.address_range[0].min(other.address_range[0]),
@@ -132,13 +122,11 @@ impl MemoryPage {
 
 	/// Returns an adapted iterator that will merge all consecutive pages in the iterator using [`try_merge_mut`](MemoryPage::try_merge_mut).
 	pub fn merge_sorted(iter: impl Iterator<Item = Self>) -> impl Iterator<Item = Self> {
-		AccFilter::new(iter, |acc, curr| {
-			match acc {
-				None => acc.replace(curr),
-				Some(a) => match a.try_merge_mut(curr) {
-					Ok(()) => None,
-					Err(other) => acc.replace(other)
-				}
+		AccFilter::new(iter, |acc, curr| match acc {
+			None => acc.replace(curr),
+			Some(a) => match a.try_merge_mut(curr) {
+				Ok(()) => None,
+				Err(other) => acc.replace(other)
 			}
 		})
 	}
@@ -148,7 +136,11 @@ impl std::fmt::Display for MemoryPage {
 		write!(
 			f,
 			"{}-{} {} {} {}",
-			self.address_range[0], self.address_range[1], self.permissions, self.offset, self.page_type
+			self.address_range[0],
+			self.address_range[1],
+			self.permissions,
+			self.offset,
+			self.page_type
 		)
 	}
 }

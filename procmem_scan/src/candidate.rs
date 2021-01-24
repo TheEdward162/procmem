@@ -1,5 +1,7 @@
-use std::num::NonZeroUsize;
-use std::cmp::{Ordering, Ord, PartialOrd};
+use std::{
+	cmp::{Ord, Ordering, PartialOrd},
+	num::NonZeroUsize
+};
 
 use procmem_access::{prelude::OffsetType, util::AccFilter};
 
@@ -61,15 +63,13 @@ impl ScannerCandidate {
 
 	/// Offset where the definitely matched candidate starts.
 	///
-	/// This differs from [`offset`](ScannerCandidate::offset) only for partial candidates. 
+	/// This differs from [`offset`](ScannerCandidate::offset) only for partial candidates.
 	pub fn start_offset(&self) -> OffsetType {
 		self.start_offset.unwrap_or(self.offset)
 	}
 
 	pub const fn end_offset(&self) -> OffsetType {
-		self.offset().saturating_add(
-			self.length().get()
-		)
+		self.offset().saturating_add(self.length().get())
 	}
 
 	pub fn advance(&mut self) {
@@ -94,12 +94,12 @@ impl ScannerCandidate {
 	pub fn try_merge_mut(&mut self, other: Self) -> Result<(), Self> {
 		// Cannot be the same match if they don't start in the same place
 		if self.offset() != other.offset() {
-			return Err(other);
+			return Err(other)
 		}
 
 		// Cannot merge if they don't intersect.
 		if self.end_offset() < other.start_offset() || other.end_offset() < self.start_offset() {
-			return Err(other);
+			return Err(other)
 		}
 
 		self.length = self.length.max(other.length);
@@ -111,13 +111,11 @@ impl ScannerCandidate {
 
 	/// Returns an adapted iterator that will merge all consecutive candidates in the iterator using [`try_merge_mut`](ScannerCandidate::try_merge_mut).
 	pub fn merge_sorted(iter: impl Iterator<Item = Self>) -> impl Iterator<Item = Self> {
-		AccFilter::new(iter, |acc, curr| {
-			match acc {
-				None => acc.replace(curr),
-				Some(a) => match a.try_merge_mut(curr) {
-					Ok(()) => None,
-					Err(other) => acc.replace(other)
-				}
+		AccFilter::new(iter, |acc, curr| match acc {
+			None => acc.replace(curr),
+			Some(a) => match a.try_merge_mut(curr) {
+				Ok(()) => None,
+				Err(other) => acc.replace(other)
 			}
 		})
 	}
@@ -129,11 +127,10 @@ impl PartialOrd for ScannerCandidate {
 }
 impl Ord for ScannerCandidate {
 	fn cmp(&self, other: &Self) -> Ordering {
-		self.offset().cmp(&other.offset()).then(
-			self.start_offset.cmp(&other.start_offset)
-		).then(
-			self.length().cmp(&other.length())
-		)
+		self.offset()
+			.cmp(&other.offset())
+			.then(self.start_offset.cmp(&other.start_offset))
+			.then(self.length().cmp(&other.length()))
 	}
 }
 
@@ -163,7 +160,7 @@ mod test {
 				length: NonZeroUsize::new(3).unwrap(),
 				resolved: false,
 				start_offset: Some(1.into())
-			},	
+			},
 			ScannerCandidate {
 				offset: 1.into(),
 				length: NonZeroUsize::new(2).unwrap(),
@@ -234,9 +231,7 @@ mod test {
 			}
 		];
 
-		let result = ScannerCandidate::merge_sorted(
-			values.iter().copied()
-		).collect::<Vec<_>>();
+		let result = ScannerCandidate::merge_sorted(values.iter().copied()).collect::<Vec<_>>();
 
 		assert_eq!(
 			result,

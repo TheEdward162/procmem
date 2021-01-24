@@ -2,9 +2,11 @@ use std::num::NonZeroUsize;
 
 use procmem_access::prelude::OffsetType;
 
-use crate::common::AsRawBytes;
-use crate::predicate::{ScannerPredicate, UpdateCandidateResult};
-use crate::candidate::ScannerCandidate;
+use crate::{
+	candidate::ScannerCandidate,
+	common::AsRawBytes,
+	predicate::{ScannerPredicate, UpdateCandidateResult}
+};
 
 use super::PartialScannerPredicate;
 
@@ -20,10 +22,7 @@ impl<T: AsRawBytes> ValuePredicate<T> {
 	///
 	/// If `aligned` is true then candidates are only generated at offsets that are divisible by [`T::align_of`](AsRawBytes::align_of)
 	pub fn new(value: T, aligned: bool) -> Self {
-		ValuePredicate {
-			value,
-			aligned
-		}
+		ValuePredicate { value, aligned }
 	}
 
 	fn offset_aligned(&self, offset: OffsetType) -> bool {
@@ -34,25 +33,28 @@ impl<T: AsRawBytes> ScannerPredicate for ValuePredicate<T> {
 	fn try_start_candidate(&self, offset: OffsetType, byte: u8) -> Option<ScannerCandidate> {
 		if self.offset_aligned(offset) {
 			if self.value.as_raw_bytes()[0] == byte {
-				return Some(
-					ScannerCandidate::normal(offset)
-				);
+				return Some(ScannerCandidate::normal(offset))
 			}
 		}
 
 		None
 	}
 
-	fn update_candidate(&self, _offset: OffsetType, byte: u8, candidate: &ScannerCandidate) -> UpdateCandidateResult {
+	fn update_candidate(
+		&self,
+		_offset: OffsetType,
+		byte: u8,
+		candidate: &ScannerCandidate
+	) -> UpdateCandidateResult {
 		let bytes = self.value.as_raw_bytes();
 		debug_assert!(candidate.length().get() < bytes.len());
 
 		if bytes[candidate.length().get()] != byte {
-			return UpdateCandidateResult::Remove;
+			return UpdateCandidateResult::Remove
 		}
 
 		if candidate.length().get() == bytes.len() - 1 {
-			return UpdateCandidateResult::Resolve;
+			return UpdateCandidateResult::Resolve
 		}
 
 		UpdateCandidateResult::Advance
@@ -61,12 +63,20 @@ impl<T: AsRawBytes> ScannerPredicate for ValuePredicate<T> {
 impl<T: AsRawBytes> PartialScannerPredicate for ValuePredicate<T> {
 	fn try_start_partial_candidates(&self, offset: OffsetType, byte: u8) -> Vec<ScannerCandidate> {
 		let mut candidates = Vec::new();
-		
-		for (i, target_byte) in self.value.as_raw_bytes().iter().copied().enumerate().skip(1).rev() {
+
+		for (i, target_byte) in self
+			.value
+			.as_raw_bytes()
+			.iter()
+			.copied()
+			.enumerate()
+			.skip(1)
+			.rev()
+		{
 			if byte != target_byte {
-				continue;
+				continue
 			}
-			
+
 			let potential_start_offset = match offset.get().checked_sub(i) {
 				// skip this candidate if it would start at a non-positive offset
 				// even though starting at offset 1 is also pretty unreal, it is not against our invariants
@@ -76,15 +86,13 @@ impl<T: AsRawBytes> PartialScannerPredicate for ValuePredicate<T> {
 			};
 
 			if !self.offset_aligned(potential_start_offset) {
-				continue;
+				continue
 			}
 
-			candidates.push(
-				ScannerCandidate::partial(
-					offset,
-					NonZeroUsize::new(i).unwrap()
-				)
-			);
+			candidates.push(ScannerCandidate::partial(
+				offset,
+				NonZeroUsize::new(i).unwrap()
+			));
 		}
 
 		candidates
@@ -94,8 +102,10 @@ impl<T: AsRawBytes> PartialScannerPredicate for ValuePredicate<T> {
 #[cfg(test)]
 mod test {
 	use super::ValuePredicate;
-	use crate::predicate::{ScannerPredicate, UpdateCandidateResult};
-	use crate::candidate::ScannerCandidate;
+	use crate::{
+		candidate::ScannerCandidate,
+		predicate::{ScannerPredicate, UpdateCandidateResult}
+	};
 
 	#[test]
 	fn test_value_predicate_start() {
@@ -106,11 +116,8 @@ mod test {
 				data_u16.len() * std::mem::size_of::<u16>()
 			)
 		};
-		
-		let predicate = ValuePredicate::new(
-			[1],
-			true
-		);
+
+		let predicate = ValuePredicate::new([1], true);
 
 		// Works correctly
 		assert_eq!(
@@ -118,15 +125,9 @@ mod test {
 			Some(ScannerCandidate::normal(100.into()))
 		);
 		// Rejects unaligned
-		assert_eq!(
-			predicate.try_start_candidate(101.into(), data[0]),
-			None
-		);
+		assert_eq!(predicate.try_start_candidate(101.into(), data[0]), None);
 		// Rejects wrong start
-		assert_eq!(
-			predicate.try_start_candidate(100.into(), data[1]),
-			None
-		);
+		assert_eq!(predicate.try_start_candidate(100.into(), data[1]), None);
 	}
 
 	#[test]
@@ -138,11 +139,8 @@ mod test {
 				data_u16.len() * std::mem::size_of::<u16>()
 			)
 		};
-		
-		let predicate = ValuePredicate::new(
-			[1, std::u16::MAX],
-			true
-		);
+
+		let predicate = ValuePredicate::new([1, std::u16::MAX], true);
 
 		// Works correctly
 		assert_eq!(
@@ -150,46 +148,30 @@ mod test {
 			Some(ScannerCandidate::normal(100.into()))
 		);
 		let mut candidate = ScannerCandidate::normal(100.into());
-		
+
 		// valid continuation
 		assert_eq!(
-			predicate.update_candidate(
-				101.into(),
-				data[1],
-				&candidate
-			),
+			predicate.update_candidate(101.into(), data[1], &candidate),
 			UpdateCandidateResult::Advance
 		);
 		candidate.advance();
 
 		// valid continuation
 		assert_eq!(
-			predicate.update_candidate(
-				102.into(),
-				data[2],
-				&candidate
-			),
+			predicate.update_candidate(102.into(), data[2], &candidate),
 			UpdateCandidateResult::Advance
 		);
 		candidate.advance();
 
 		// final continuation
 		assert_eq!(
-			predicate.update_candidate(
-				102.into(),
-				data[3],
-				&candidate
-			),
+			predicate.update_candidate(102.into(), data[3], &candidate),
 			UpdateCandidateResult::Resolve
 		);
 
 		// invalid continuation
 		assert_eq!(
-			predicate.update_candidate(
-				102.into(),
-				data[1],
-				&candidate
-			),
+			predicate.update_candidate(102.into(), data[1], &candidate),
 			UpdateCandidateResult::Remove
 		);
 	}

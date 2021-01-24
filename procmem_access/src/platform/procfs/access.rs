@@ -1,22 +1,26 @@
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write, Seek, SeekFrom};
+use std::{
+	fs::{File, OpenOptions},
+	io::{Read, Seek, SeekFrom, Write}
+};
 
 use thiserror::Error;
 
-use crate::common::OffsetType;
-use crate::memory::access::{
-	LockError,
-	ExclusiveLockError,
-	UnlockError,
-	ReadError,
-	WriteError,
-	MemoryAccess
+use crate::{
+	common::OffsetType,
+	memory::access::{
+		ExclusiveLockError,
+		LockError,
+		MemoryAccess,
+		ReadError,
+		UnlockError,
+		WriteError
+	}
 };
 
 #[derive(Debug, Error)]
 pub enum ProcfsAccessOpenError {
 	#[error("could not open memory file")]
-	MemoryIo(#[from] std::io::Error),
+	MemoryIo(#[from] std::io::Error)
 }
 
 pub struct ProcfsAccess {
@@ -31,34 +35,30 @@ impl ProcfsAccess {
 
 	pub fn open(pid: libc::pid_t) -> Result<Self, ProcfsAccessOpenError> {
 		let path = Self::mem_path(pid);
-		
-		let mem = OpenOptions::new().read(true).write(true).open(path).map_err(
-			|err| ProcfsAccessOpenError::MemoryIo(err)
-		)?;
 
-		Ok(
-			ProcfsAccess {
-				pid,
-				ptrace_lock: 0,
-				mem
-			}
-		)
+		let mem = OpenOptions::new()
+			.read(true)
+			.write(true)
+			.open(path)
+			.map_err(|err| ProcfsAccessOpenError::MemoryIo(err))?;
+
+		Ok(ProcfsAccess {
+			pid,
+			ptrace_lock: 0,
+			mem
+		})
 	}
 
 	/// ## Safety
 	/// * ?? maybe it doesn't need to be unsafe?
 	unsafe fn ptrace_attach(&mut self) -> Result<(), LockError> {
 		if libc::ptrace(libc::PTRACE_ATTACH, self.pid, 0, 0) != 0 {
-			return Err(
-				LockError::PtraceError(std::io::Error::last_os_error())
-			)
+			return Err(LockError::PtraceError(std::io::Error::last_os_error()))
 		}
 
 		let waitpid_res = libc::waitpid(self.pid, std::ptr::null_mut(), 0);
 		if waitpid_res == -1 {
-			return Err(
-				LockError::WaitpidError(std::io::Error::last_os_error())
-			)
+			return Err(LockError::WaitpidError(std::io::Error::last_os_error()))
 		}
 		debug_assert_eq!(waitpid_res, self.pid);
 
@@ -69,9 +69,7 @@ impl ProcfsAccess {
 	/// * ?? maybe it doesn't need to be unsafe?
 	unsafe fn ptrace_detach(&mut self) -> Result<(), UnlockError> {
 		if libc::ptrace(libc::PTRACE_DETACH, self.pid, 0, 0) != 0 {
-			return Err(
-				UnlockError::PtraceError(std::io::Error::last_os_error())
-			)
+			return Err(UnlockError::PtraceError(std::io::Error::last_os_error()))
 		}
 
 		Ok(())
@@ -99,7 +97,7 @@ impl MemoryAccess for ProcfsAccess {
 				self.ptrace_attach()?;
 			}
 		} else {
-			return Err(ExclusiveLockError::AlreadyLocked);
+			return Err(ExclusiveLockError::AlreadyLocked)
 		}
 
 		Ok(())
@@ -107,7 +105,7 @@ impl MemoryAccess for ProcfsAccess {
 
 	fn unlock(&mut self) -> Result<bool, UnlockError> {
 		if self.ptrace_lock == 0 {
-			return Err(UnlockError::NotLocked);
+			return Err(UnlockError::NotLocked)
 		}
 
 		self.ptrace_lock -= 1;
@@ -123,9 +121,7 @@ impl MemoryAccess for ProcfsAccess {
 	}
 
 	unsafe fn read(&mut self, offset: OffsetType, buffer: &mut [u8]) -> Result<(), ReadError> {
-		self.mem.seek(
-			SeekFrom::Start(offset.get()as u64)
-		)?;
+		self.mem.seek(SeekFrom::Start(offset.get() as u64))?;
 
 		self.mem.read_exact(buffer)?;
 
@@ -133,9 +129,7 @@ impl MemoryAccess for ProcfsAccess {
 	}
 
 	unsafe fn write(&mut self, offset: OffsetType, data: &[u8]) -> Result<(), WriteError> {
-		self.mem.seek(
-			SeekFrom::Start(offset.get() as u64)
-		)?;
+		self.mem.seek(SeekFrom::Start(offset.get() as u64))?;
 
 		self.mem.write_all(data)?;
 
@@ -145,9 +139,7 @@ impl MemoryAccess for ProcfsAccess {
 impl Drop for ProcfsAccess {
 	fn drop(&mut self) {
 		if self.ptrace_lock > 0 {
-			unsafe {
-				self.ptrace_detach().unwrap()
-			}
+			unsafe { self.ptrace_detach().unwrap() }
 		}
 	}
 }

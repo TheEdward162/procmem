@@ -1,4 +1,3 @@
-
 /// An iterator that is a hybrid of `filter` and `fold`.
 ///
 /// Like `filter`, each iteration may or may not yield a value.
@@ -17,31 +16,20 @@
 /// 		_ => acc.replace(curr)
 /// 	}
 /// );
-/// 
+///
 /// let deduped = dedup.collect::<Vec<_>>();
 /// assert_eq!(
 /// 	deduped,
 /// 	&[1, 2, 3, 4]
 /// );
 /// ```
-pub struct AccFilter<
-	I: Iterator<Item = T>,
-	F: FnMut(&mut Option<T>, T) -> Option<T>,
-	T
-> {
+pub struct AccFilter<I: Iterator<Item = T>, F: FnMut(&mut Option<T>, T) -> Option<T>, T> {
 	iter: I,
 	fun: F,
 	state: Option<T>
 }
-impl<
-	I: Iterator<Item = T>,
-	F: FnMut(&mut Option<T>, T) -> Option<T>,
-	T
-> AccFilter<I, F, T> {
-	pub fn new(
-		iter: I,
-		fun: F
-	) -> Self {
+impl<I: Iterator<Item = T>, F: FnMut(&mut Option<T>, T) -> Option<T>, T> AccFilter<I, F, T> {
+	pub fn new(iter: I, fun: F) -> Self {
 		AccFilter {
 			iter,
 			fun,
@@ -49,11 +37,9 @@ impl<
 		}
 	}
 }
-impl<
-	I: Iterator<Item = T>,
-	F: FnMut(&mut Option<T>, T) -> Option<T>,
-	T
-> Iterator for AccFilter<I, F, T> {
+impl<I: Iterator<Item = T>, F: FnMut(&mut Option<T>, T) -> Option<T>, T> Iterator
+	for AccFilter<I, F, T>
+{
 	type Item = T;
 
 	fn next(&mut self) -> Option<Self::Item> {
@@ -75,18 +61,16 @@ mod test {
 
 	#[test]
 	fn test_acc_filter() {
-		let dedup = AccFilter::new(
-			[1, 1, 1, 2, 3, 3, 4, 4, 4].iter().copied(),
-			|acc, curr| match acc {
-				Some(acc) if *acc == curr => None,
-				_ => acc.replace(curr)
-			}
-		);
+		let dedup =
+			AccFilter::new(
+				[1, 1, 1, 2, 3, 3, 4, 4, 4].iter().copied(),
+				|acc, curr| match acc {
+					Some(acc) if *acc == curr => None,
+					_ => acc.replace(curr)
+				}
+			);
 
 		let deduped = dedup.collect::<Vec<_>>();
-		assert_eq!(
-			deduped,
-			&[1, 2, 3, 4]
-		);
+		assert_eq!(deduped, &[1, 2, 3, 4]);
 	}
 }

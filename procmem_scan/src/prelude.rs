@@ -1,6 +1,6 @@
 pub use crate::{
-	common::AsRawBytes,
-	predicate::{ScannerPredicate, PartialScannerPredicate, value::ValuePredicate},
 	candidate::ScannerCandidate,
+	common::AsRawBytes,
+	predicate::{value::ValuePredicate, PartialScannerPredicate, ScannerPredicate},
 	stream::StreamScanner
 };
