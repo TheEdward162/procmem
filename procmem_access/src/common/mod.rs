@@ -2,9 +2,6 @@
 
 use std::num::NonZeroUsize;
 
-pub mod raw_bytes;
-pub use raw_bytes::*;
-
 /// Type to represent the offset of the address space.
 ///
 /// This is basically the native pointer type, and we also assume it cannot be null.

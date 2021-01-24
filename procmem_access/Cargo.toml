@@ -1,0 +1,9 @@
+[package]
+name = "procmem_access"
+version = "0.1.0"
+authors = ["TheEdward162 <thedward162@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+libc = "0.2"
+thiserror = "1"

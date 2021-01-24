@@ -1,9 +1,9 @@
 use std::num::NonZeroUsize;
 
-use crate::common::OffsetType;
+use procmem_access::prelude::OffsetType;
 
-use super::ScannerCandidate;
-use super::predicate::{ScannerPredicate, UpdateCandidateResult, PartialScannerPredicate};
+use crate::candidate::ScannerCandidate;
+use crate::predicate::{ScannerPredicate, UpdateCandidateResult, PartialScannerPredicate};
 
 /// Scans a stream of bytes for values matching the predicate.
 pub struct StreamScanner<P: ScannerPredicate> {
@@ -292,7 +292,7 @@ mod test {
 	use std::num::NonZeroUsize;
 	use std::convert::TryInto;
 
-    use crate::scanner::predicate::value::ValuePredicate;
+    use crate::predicate::value::ValuePredicate;
 	use super::StreamScanner;
 	use crate::common::AsRawBytes;
 

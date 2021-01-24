@@ -1,5 +1,11 @@
-use procmem::{memory::map::MemoryPage, platform::procfs::{map::ProcfsMemoryMap, access::ProcfsAccess}, scanner::{predicate::value::ValuePredicate, stream::StreamScanner}};
-use procmem::memory::{access::MemoryAccess, map::{MemoryMap, MemoryPageType}};
+use procmem_access::prelude::{
+	MemoryAccess,
+	MemoryMap, MemoryPage, MemoryPageType
+};
+use procmem_access::platform::procfs::{ProcfsMemoryMap, ProcfsAccess};
+use procmem_scan::prelude::{
+	ValuePredicate, StreamScanner
+};
 
 fn main() {
 	// simple cli parse

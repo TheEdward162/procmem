@@ -1,6 +1,6 @@
-use crate::common::OffsetType;
+use procmem_access::prelude::OffsetType;
 
-use super::candidate::ScannerCandidate;
+use crate::candidate::ScannerCandidate;
 
 pub mod value;
 

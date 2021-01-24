@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 use std::cmp::{Ordering, Ord, PartialOrd};
 
-use crate::{common::OffsetType, util::AccFilter};
+use procmem_access::{prelude::OffsetType, util::AccFilter};
 
 /// Candidate match for stream scanner.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

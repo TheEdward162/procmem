@@ -1,9 +1,10 @@
 use std::num::NonZeroUsize;
 
-use crate::common::{OffsetType, AsRawBytes};
+use procmem_access::prelude::OffsetType;
 
-use crate::scanner::predicate::{ScannerPredicate, UpdateCandidateResult};
-use crate::scanner::candidate::ScannerCandidate;
+use crate::common::AsRawBytes;
+use crate::predicate::{ScannerPredicate, UpdateCandidateResult};
+use crate::candidate::ScannerCandidate;
 
 use super::PartialScannerPredicate;
 
@@ -93,8 +94,8 @@ impl<T: AsRawBytes> PartialScannerPredicate for ValuePredicate<T> {
 #[cfg(test)]
 mod test {
 	use super::ValuePredicate;
-	use crate::scanner::predicate::{ScannerPredicate, UpdateCandidateResult};
-	use crate::scanner::candidate::ScannerCandidate;
+	use crate::predicate::{ScannerPredicate, UpdateCandidateResult};
+	use crate::candidate::ScannerCandidate;
 
 	#[test]
 	fn test_value_predicate_start() {
