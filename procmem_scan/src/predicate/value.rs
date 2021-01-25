@@ -86,12 +86,11 @@ impl<T: AsRawBytes> PartialScannerPredicate for ValuePredicate<T> {
 				continue
 			}
 
-			let potential_start_offset = match offset.get().checked_sub(i) {
+			let potential_start_offset = match offset.get().saturating_sub(i) {
 				// skip this candidate if it would start at a non-positive offset
 				// even though starting at offset 1 is also pretty unreal, it is not against our invariants
-				None => continue,
-				Some(p) if p == 0 => continue,
-				Some(p) => p.into()
+				0 => continue,
+				p => OffsetType::new_unwrap(p)
 			};
 
 			if !self.offset_aligned(potential_start_offset) {
@@ -116,7 +115,9 @@ impl<T: AsRawBytes> PartialScannerPredicate for ValuePredicate<T> {
 mod test {
 	use std::num::NonZeroUsize;
 
-	use super::ValuePredicate;
+	use procmem_access::prelude::OffsetType;
+
+    use super::ValuePredicate;
 	use crate::{candidate::ScannerCandidate, common::AsRawBytes, predicate::{ScannerPredicate, PartialScannerPredicate, UpdateCandidateResult}};
 
 	#[test]
@@ -127,17 +128,17 @@ mod test {
 		let predicate = ValuePredicate::new([1], true);
 
 		// Works correctly
-		let result = predicate.try_start_candidate(100.into(), data[0]).unwrap();
-		assert_eq!(result.offset(), 100.into());
-		assert_eq!(result.start_offset(), 100.into());
+		let result = predicate.try_start_candidate(OffsetType::new_unwrap(100), data[0]).unwrap();
+		assert_eq!(result.offset(), OffsetType::new_unwrap(100));
+		assert_eq!(result.start_offset(), OffsetType::new_unwrap(100));
 		assert_eq!(result.length(), NonZeroUsize::new(1).unwrap());
 		assert!(!result.is_partial());
 		assert!(!result.is_resolved());
 
 		// Rejects unaligned
-		assert_eq!(predicate.try_start_candidate(101.into(), data[0]), None);
+		assert_eq!(predicate.try_start_candidate(OffsetType::new_unwrap(101), data[0]), None);
 		// Rejects wrong start
-		assert_eq!(predicate.try_start_candidate(100.into(), data[1]), None);
+		assert_eq!(predicate.try_start_candidate(OffsetType::new_unwrap(100), data[1]), None);
 	}
 
 	#[test]
@@ -146,9 +147,9 @@ mod test {
 
 		let predicate = ValuePredicate::new(1u8, false);
 
-		let result = predicate.try_start_candidate(100.into(), data).unwrap();
-		assert_eq!(result.offset(), 100.into());
-		assert_eq!(result.start_offset(), 100.into());
+		let result = predicate.try_start_candidate(OffsetType::new_unwrap(100), data).unwrap();
+		assert_eq!(result.offset(), OffsetType::new_unwrap(100));
+		assert_eq!(result.start_offset(), OffsetType::new_unwrap(100));
 		assert_eq!(result.length(), NonZeroUsize::new(1).unwrap());
 		assert!(!result.is_partial());
 		assert!(result.is_resolved());
@@ -160,9 +161,9 @@ mod test {
 
 		let predicate = ValuePredicate::new([2u8, 3], false);
 		
-		let result = predicate.try_start_partial_candidates(102.into(), data[2])[0];
-		assert_eq!(result.offset(), 101.into());
-		assert_eq!(result.start_offset(), 102.into());
+		let result = predicate.try_start_partial_candidates(OffsetType::new_unwrap(102), data[2])[0];
+		assert_eq!(result.offset(), OffsetType::new_unwrap(101));
+		assert_eq!(result.start_offset(), OffsetType::new_unwrap(102));
 		assert_eq!(result.length(), NonZeroUsize::new(2).unwrap());
 		assert!(result.is_partial());
 		assert!(result.is_resolved());
@@ -182,34 +183,34 @@ mod test {
 
 		// Works correctly
 		assert_eq!(
-			predicate.try_start_candidate(100.into(), data[0]),
-			Some(ScannerCandidate::normal(100.into()))
+			predicate.try_start_candidate(OffsetType::new_unwrap(100), data[0]),
+			Some(ScannerCandidate::normal(OffsetType::new_unwrap(100)))
 		);
-		let mut candidate = ScannerCandidate::normal(100.into());
+		let mut candidate = ScannerCandidate::normal(OffsetType::new_unwrap(100));
 
 		// valid continuation
 		assert_eq!(
-			predicate.update_candidate(101.into(), data[1], &candidate),
+			predicate.update_candidate(OffsetType::new_unwrap(101), data[1], &candidate),
 			UpdateCandidateResult::Advance
 		);
 		candidate.advance();
 
 		// valid continuation
 		assert_eq!(
-			predicate.update_candidate(102.into(), data[2], &candidate),
+			predicate.update_candidate(OffsetType::new_unwrap(102), data[2], &candidate),
 			UpdateCandidateResult::Advance
 		);
 		candidate.advance();
 
 		// final continuation
 		assert_eq!(
-			predicate.update_candidate(102.into(), data[3], &candidate),
+			predicate.update_candidate(OffsetType::new_unwrap(102), data[3], &candidate),
 			UpdateCandidateResult::Resolve
 		);
 
 		// invalid continuation
 		assert_eq!(
-			predicate.update_candidate(102.into(), data[1], &candidate),
+			predicate.update_candidate(OffsetType::new_unwrap(102), data[1], &candidate),
 			UpdateCandidateResult::Remove
 		);
 	}

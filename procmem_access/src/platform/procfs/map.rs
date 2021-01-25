@@ -158,7 +158,7 @@ impl ProcfsMemoryMap {
 		);
 
 		Ok(MemoryPage {
-			address_range: [from.into(), to.into()],
+			address_range: [OffsetType::new_unwrap(from), OffsetType::new_unwrap(to)],
 			permissions,
 			offset,
 			page_type
@@ -212,7 +212,7 @@ pub enum MemoryPageParseError {
 #[cfg(test)]
 mod test {
 	use super::ProcfsMemoryMap;
-	use crate::memory::map::{MemoryPage, MemoryPagePermissions, MemoryPageType};
+	use crate::{memory::map::{MemoryPage, MemoryPagePermissions, MemoryPageType}, prelude::OffsetType};
 
 	#[test]
 	fn test_procfs_maps_parse() {
@@ -222,7 +222,7 @@ mod test {
 		assert_eq!(
 			value,
 			MemoryPage {
-				address_range: [496.into(), 527.into()],
+				address_range: [OffsetType::new_unwrap(496), OffsetType::new_unwrap(527)],
 				permissions: MemoryPagePermissions::new(true, true, false, false),
 				offset: 0,
 				page_type: MemoryPageType::Heap

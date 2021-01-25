@@ -155,18 +155,20 @@ pub trait MemoryMap {
 
 #[cfg(test)]
 mod test {
-	use super::{MemoryPage, MemoryPagePermissions, MemoryPageType};
+	use crate::prelude::OffsetType;
+
+    use super::{MemoryPage, MemoryPagePermissions, MemoryPageType};
 
 	#[test]
 	fn test_memory_page_merge() {
 		let mut left = MemoryPage {
-			address_range: [100.into(), 200.into()],
+			address_range: [OffsetType::new_unwrap(100), OffsetType::new_unwrap(200)],
 			permissions: MemoryPagePermissions::new(true, true, false, true),
 			offset: 0,
 			page_type: MemoryPageType::Anon
 		};
 		let right = MemoryPage {
-			address_range: [200.into(), 300.into()],
+			address_range: [OffsetType::new_unwrap(200), OffsetType::new_unwrap(300)],
 			permissions: MemoryPagePermissions::new(true, false, true, false),
 			offset: 100,
 			page_type: MemoryPageType::Heap
@@ -176,7 +178,7 @@ mod test {
 		assert_eq!(
 			left,
 			MemoryPage {
-				address_range: [100.into(), 300.into()],
+				address_range: [OffsetType::new_unwrap(100), OffsetType::new_unwrap(300)],
 				permissions: MemoryPagePermissions::new(true, false, false, false),
 				offset: 0,
 				page_type: MemoryPageType::Unknown
@@ -184,13 +186,13 @@ mod test {
 		);
 
 		let mut left = MemoryPage {
-			address_range: [400.into(), 500.into()],
+			address_range: [OffsetType::new_unwrap(400), OffsetType::new_unwrap(500)],
 			permissions: MemoryPagePermissions::new(true, true, false, true),
 			offset: 400,
 			page_type: MemoryPageType::Stack
 		};
 		let right = MemoryPage {
-			address_range: [200.into(), 400.into()],
+			address_range: [OffsetType::new_unwrap(200), OffsetType::new_unwrap(400)],
 			permissions: MemoryPagePermissions::new(true, false, true, false),
 			offset: 200,
 			page_type: MemoryPageType::Stack
@@ -200,7 +202,7 @@ mod test {
 		assert_eq!(
 			left,
 			MemoryPage {
-				address_range: [200.into(), 500.into()],
+				address_range: [OffsetType::new_unwrap(200), OffsetType::new_unwrap(500)],
 				permissions: MemoryPagePermissions::new(true, false, false, false),
 				offset: 200,
 				page_type: MemoryPageType::Stack
@@ -211,13 +213,13 @@ mod test {
 	#[test]
 	fn test_memory_page_merge_err() {
 		let mut left = MemoryPage {
-			address_range: [400.into(), 500.into()],
+			address_range: [OffsetType::new_unwrap(400), OffsetType::new_unwrap(500)],
 			permissions: MemoryPagePermissions::new(true, true, false, true),
 			offset: 400,
 			page_type: MemoryPageType::Stack
 		};
 		let right = MemoryPage {
-			address_range: [200.into(), 300.into()],
+			address_range: [OffsetType::new_unwrap(200), OffsetType::new_unwrap(300)],
 			permissions: MemoryPagePermissions::new(true, false, true, false),
 			offset: 200,
 			page_type: MemoryPageType::Stack

@@ -280,7 +280,9 @@ impl<'a, P: ScannerPredicate, I: Iterator<Item = u8>> Iterator for StreamScanner
 mod test {
 	use std::{convert::TryInto, num::NonZeroUsize};
 
-	use super::StreamScanner;
+	use procmem_access::prelude::OffsetType;
+
+    use super::StreamScanner;
 	use crate::{common::AsRawBytes, predicate::value::ValuePredicate};
 
 	#[test]
@@ -290,10 +292,10 @@ mod test {
 		let predicate = ValuePredicate::new(data, true);
 		let mut scanner = StreamScanner::new(predicate);
 		let found: Vec<_> = scanner.scan_once(
-			1.into(), data.iter().copied()
+			OffsetType::new_unwrap(1), data.iter().copied()
 		).collect();
 
-		assert_eq!(found, &[(1.into(), NonZeroUsize::new(data.len()).unwrap())]);
+		assert_eq!(found, &[(OffsetType::new_unwrap(1), NonZeroUsize::new(data.len()).unwrap())]);
 	}
 
 	#[test]
@@ -303,10 +305,10 @@ mod test {
 		let predicate = ValuePredicate::new(data, true);
 		let mut scanner = StreamScanner::new(predicate);
 		let found: Vec<_> = scanner.scan_once(
-			1.into(), std::iter::once(data)
+			OffsetType::new_unwrap(1), std::iter::once(data)
 		).collect();
 
-		assert_eq!(found, &[(1.into(), NonZeroUsize::new(1).unwrap())]);
+		assert_eq!(found, &[(OffsetType::new_unwrap(1), NonZeroUsize::new(1).unwrap())]);
 	}
 
 	#[test]
@@ -316,16 +318,16 @@ mod test {
 		let predicate = ValuePredicate::new([1u64, 0, 1, 0], true);
 		let mut scanner = StreamScanner::new(predicate);
 		let found: Vec<_> = scanner.scan_once(
-			8.into(),
+			OffsetType::new_unwrap(8),
 			data.as_raw_bytes().iter().copied()
 		).collect();
 
 		assert_eq!(
 			found,
 			&[
-				(16.into(), 32.try_into().unwrap()),
-				(32.into(), 32.try_into().unwrap()),
-				(72.into(), 32.try_into().unwrap())
+				(OffsetType::new_unwrap(16), 32.try_into().unwrap()),
+				(OffsetType::new_unwrap(32), 32.try_into().unwrap()),
+				(OffsetType::new_unwrap(72), 32.try_into().unwrap())
 			]
 		);
 	}
@@ -342,13 +344,13 @@ mod test {
 		let mut found = Vec::new();
 		found.extend(
 			scanner.scan_partial(
-				8.into(),
+				OffsetType::new_unwrap(8),
 				data.as_raw_bytes().iter().copied()
 			)
 		);
 		found.extend(
 			scanner.scan_partial(
-				112.into(),
+				OffsetType::new_unwrap(112),
 				second_data.as_raw_bytes().iter().copied()
 			)
 		);
@@ -356,9 +358,9 @@ mod test {
 		assert_eq!(
 			found,
 			&[
-				(16.into(), NonZeroUsize::new(32).unwrap()),
-				(64.into(), NonZeroUsize::new(32).unwrap()),
-				(104.into(), NonZeroUsize::new(32).unwrap()),
+				(OffsetType::new_unwrap(16), NonZeroUsize::new(32).unwrap()),
+				(OffsetType::new_unwrap(64), NonZeroUsize::new(32).unwrap()),
+				(OffsetType::new_unwrap(104), NonZeroUsize::new(32).unwrap()),
 			]
 		);
 	}
@@ -370,18 +372,18 @@ mod test {
 
 		let mut scanner = StreamScanner::new(predicate);
 
-		let found_scan_once: Vec<_> = scanner.scan_once(1.into(), data.iter().copied()).collect();
+		let found_scan_once: Vec<_> = scanner.scan_once(OffsetType::new_unwrap(1), data.iter().copied()).collect();
 
 		let mut found_scan_partial = Vec::new();
 		found_scan_partial.extend(
 			scanner.scan_partial(
-				4.into(),
+				OffsetType::new_unwrap(4),
 				data[3 ..].iter().copied()
 			)
 		);
 		found_scan_partial.extend(
 			scanner.scan_partial(
-				1.into(),
+				OffsetType::new_unwrap(1),
 				data[.. 3].iter().copied()
 			)
 		);
@@ -405,19 +407,19 @@ mod test {
 		let mut found_scan_partial = Vec::new();
 		found_scan_partial.extend(
 			scanner_1.scan_partial(
-				4.into(),
+				OffsetType::new_unwrap(4),
 				data[3 .. 7].iter().copied()
 			)
 		);
 		found_scan_partial.extend(
 			scanner_2.scan_partial(
-				1.into(),
+				OffsetType::new_unwrap(1),
 				data[.. 3].iter().copied()
 			)
 		);
 		found_scan_partial.extend(
 			scanner_3.scan_partial(
-				8.into(),
+				OffsetType::new_unwrap(8),
 				data[7 .. ].iter().copied()
 			)
 		);
@@ -432,9 +434,9 @@ mod test {
 		assert_eq!(
 			found_scan_partial,
 			&[
-				(1.into(), NonZeroUsize::new(2).unwrap()),
-				(3.into(), NonZeroUsize::new(2).unwrap()),
-				(7.into(), NonZeroUsize::new(2).unwrap())
+				(OffsetType::new_unwrap(1), NonZeroUsize::new(2).unwrap()),
+				(OffsetType::new_unwrap(3), NonZeroUsize::new(2).unwrap()),
+				(OffsetType::new_unwrap(7), NonZeroUsize::new(2).unwrap())
 			]
 		);
 	}

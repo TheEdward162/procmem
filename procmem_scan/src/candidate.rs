@@ -38,7 +38,7 @@ impl ScannerCandidate {
 			length,
 			resolved: false,
 			start_offset: Some(
-				(offset.get() + length.get() - 1).into()
+				OffsetType::new_unwrap(offset.get() + length.get() - 1)
 			)
 		}
 	}
@@ -59,13 +59,9 @@ impl ScannerCandidate {
 	///
 	/// The parameters behave the same as with [`partial`](ScannerCadidate::partial).
 	pub fn partial_resolved(offset: OffsetType, length: NonZeroUsize) -> Self {
-		ScannerCandidate {
-			offset,
-			length,
+		Self {
 			resolved: true,
-			start_offset: Some(
-				(offset.get() + length.get() - 1).into()
-			)
+			.. Self::partial(offset, length)
 		}
 	}
 
@@ -171,51 +167,53 @@ impl Ord for ScannerCandidate {
 mod test {
 	use std::num::NonZeroUsize;
 
-	use super::ScannerCandidate;
+	use procmem_access::prelude::OffsetType;
+
+    use super::ScannerCandidate;
 
 	#[test]
 	fn test_scanner_candidate_construction() {
-		let candidate = ScannerCandidate::normal(10.into());
+		let candidate = ScannerCandidate::normal(OffsetType::new_unwrap(10));
 		assert_eq!(
 			candidate,
 			ScannerCandidate {
-				offset: 10.into(),
+				offset: OffsetType::new_unwrap(10),
 				length: NonZeroUsize::new(1).unwrap(),
 				resolved: false,
 				start_offset: None
 			}
 		);
 
-		let candidate = ScannerCandidate::resolved(20.into(), NonZeroUsize::new(12));
+		let candidate = ScannerCandidate::resolved(OffsetType::new_unwrap(20), NonZeroUsize::new(12));
 		assert_eq!(
 			candidate,
 			ScannerCandidate {
-				offset: 20.into(),
+				offset: OffsetType::new_unwrap(20),
 				length: NonZeroUsize::new(12).unwrap(),
 				resolved: true,
 				start_offset: None
 			}
 		);
 
-		let candidate = ScannerCandidate::partial(11.into(), NonZeroUsize::new(5).unwrap());
+		let candidate = ScannerCandidate::partial(OffsetType::new_unwrap(11), NonZeroUsize::new(5).unwrap());
 		assert_eq!(
 			candidate,
 			ScannerCandidate {
-				offset: 11.into(),
+				offset: OffsetType::new_unwrap(11),
 				length: NonZeroUsize::new(5).unwrap(),
 				resolved: false,
-				start_offset: Some(15.into())
+				start_offset: Some(OffsetType::new_unwrap(15))
 			}
 		);
 
-		let candidate = ScannerCandidate::partial_resolved(10.into(), NonZeroUsize::new(2).unwrap());
+		let candidate = ScannerCandidate::partial_resolved(OffsetType::new_unwrap(10), NonZeroUsize::new(2).unwrap());
 		assert_eq!(
 			candidate,
 			ScannerCandidate {
-				offset: 10.into(),
+				offset: OffsetType::new_unwrap(10),
 				length: NonZeroUsize::new(2).unwrap(),
 				resolved: true,
-				start_offset: Some(11.into())
+				start_offset: Some(OffsetType::new_unwrap(11))
 			}
 		);
 	}
@@ -224,25 +222,25 @@ mod test {
 	fn test_scanner_candidate_sort() {
 		let mut candidates = [
 			ScannerCandidate {
-				offset: 2.into(),
+				offset: OffsetType::new_unwrap(2),
 				length: NonZeroUsize::new(2).unwrap(),
 				resolved: false,
 				start_offset: None
 			},
 			ScannerCandidate {
-				offset: 2.into(),
+				offset: OffsetType::new_unwrap(2),
 				length: NonZeroUsize::new(1).unwrap(),
 				resolved: false,
 				start_offset: None
 			},
 			ScannerCandidate {
-				offset: 1.into(),
+				offset: OffsetType::new_unwrap(1),
 				length: NonZeroUsize::new(3).unwrap(),
 				resolved: false,
-				start_offset: Some(1.into())
+				start_offset: Some(OffsetType::new_unwrap(1))
 			},
 			ScannerCandidate {
-				offset: 1.into(),
+				offset: OffsetType::new_unwrap(1),
 				length: NonZeroUsize::new(2).unwrap(),
 				resolved: false,
 				start_offset: None
@@ -255,25 +253,25 @@ mod test {
 			candidates,
 			[
 				ScannerCandidate {
-					offset: 1.into(),
+					offset: OffsetType::new_unwrap(1),
 					length: NonZeroUsize::new(2).unwrap(),
 					resolved: false,
 					start_offset: None
 				},
 				ScannerCandidate {
-					offset: 1.into(),
+					offset: OffsetType::new_unwrap(1),
 					length: NonZeroUsize::new(3).unwrap(),
 					resolved: false,
-					start_offset: Some(1.into())
+					start_offset: Some(OffsetType::new_unwrap(1))
 				},
 				ScannerCandidate {
-					offset: 2.into(),
+					offset: OffsetType::new_unwrap(2),
 					length: NonZeroUsize::new(1).unwrap(),
 					resolved: false,
 					start_offset: None
 				},
 				ScannerCandidate {
-					offset: 2.into(),
+					offset: OffsetType::new_unwrap(2),
 					length: NonZeroUsize::new(2).unwrap(),
 					resolved: false,
 					start_offset: None
@@ -286,25 +284,25 @@ mod test {
 	fn test_scanner_candidate_merge() {
 		let values = [
 			ScannerCandidate {
-				offset: 1.into(),
+				offset: OffsetType::new_unwrap(1),
 				length: NonZeroUsize::new(2).unwrap(),
 				resolved: false,
 				start_offset: None
 			},
 			ScannerCandidate {
-				offset: 1.into(),
+				offset: OffsetType::new_unwrap(1),
 				length: NonZeroUsize::new(3).unwrap(),
 				resolved: false,
-				start_offset: Some(1.into())
+				start_offset: Some(OffsetType::new_unwrap(1))
 			},
 			ScannerCandidate {
-				offset: 2.into(),
+				offset: OffsetType::new_unwrap(2),
 				length: NonZeroUsize::new(1).unwrap(),
 				resolved: false,
 				start_offset: None
 			},
 			ScannerCandidate {
-				offset: 2.into(),
+				offset: OffsetType::new_unwrap(2),
 				length: NonZeroUsize::new(2).unwrap(),
 				resolved: true,
 				start_offset: None
@@ -317,13 +315,13 @@ mod test {
 			result,
 			&[
 				ScannerCandidate {
-					offset: 1.into(),
+					offset: OffsetType::new_unwrap(1),
 					length: NonZeroUsize::new(3).unwrap(),
 					resolved: false,
 					start_offset: None
 				},
 				ScannerCandidate {
-					offset: 2.into(),
+					offset: OffsetType::new_unwrap(2),
 					length: NonZeroUsize::new(2).unwrap(),
 					resolved: true,
 					start_offset: None
@@ -339,16 +337,16 @@ mod test {
 		// ^------^ left
 		//            ^ right
 		let mut left = ScannerCandidate {
-			offset: 8.into(),
+			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(3).unwrap(),
 			resolved: false,
 			start_offset: None
 		};
 		let right = ScannerCandidate {
-			offset: 8.into(),
+			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(4).unwrap(),
 			resolved: false,
-			start_offset: Some(10.into())
+			start_offset: Some(OffsetType::new_unwrap(10))
 		};
 
 		left.try_merge_mut(right).unwrap();
@@ -356,7 +354,7 @@ mod test {
 		assert_eq!(
 			left,
 			ScannerCandidate {
-				offset: 8.into(),
+				offset: OffsetType::new_unwrap(8),
 				length: NonZeroUsize::new(4).unwrap(),
 				resolved: false,
 				start_offset: None
@@ -371,16 +369,16 @@ mod test {
 		//    ^---^ left
 		//            ^ right
 		let mut left = ScannerCandidate {
-			offset: 8.into(),
+			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(3).unwrap(),
 			resolved: false,
-			start_offset: Some(9.into())
+			start_offset: Some(OffsetType::new_unwrap(9))
 		};
 		let right = ScannerCandidate {
-			offset: 8.into(),
+			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(4).unwrap(),
 			resolved: true,
-			start_offset: Some(11.into())
+			start_offset: Some(OffsetType::new_unwrap(11))
 		};
 
 		left.try_merge_mut(right).unwrap();
@@ -388,10 +386,10 @@ mod test {
 		assert_eq!(
 			left,
 			ScannerCandidate {
-				offset: 8.into(),
+				offset: OffsetType::new_unwrap(8),
 				length: NonZeroUsize::new(4).unwrap(),
 				resolved: true,
-				start_offset: Some(9.into())
+				start_offset: Some(OffsetType::new_unwrap(9))
 			}
 		);
 	}
@@ -403,16 +401,16 @@ mod test {
 		//    ^ left
 		//        ^---^ right
 		let mut left = ScannerCandidate {
-			offset: 8.into(),
+			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(2).unwrap(),
 			resolved: false,
-			start_offset: Some(9.into())
+			start_offset: Some(OffsetType::new_unwrap(9))
 		};
 		let right = ScannerCandidate {
-			offset: 8.into(),
+			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(4).unwrap(),
 			resolved: true,
-			start_offset: Some(10.into())
+			start_offset: Some(OffsetType::new_unwrap(10))
 		};
 
 		left.try_merge_mut(right).unwrap();
@@ -420,10 +418,10 @@ mod test {
 		assert_eq!(
 			left,
 			ScannerCandidate {
-				offset: 8.into(),
+				offset: OffsetType::new_unwrap(8),
 				length: NonZeroUsize::new(4).unwrap(),
 				resolved: true,
-				start_offset: Some(9.into())
+				start_offset: Some(OffsetType::new_unwrap(9))
 			}
 		);
 	}
@@ -431,31 +429,31 @@ mod test {
 	#[test]
 	fn test_scanner_candidate_merge_err() {
 		let mut left = ScannerCandidate {
-			offset: 9.into(),
+			offset: OffsetType::new_unwrap(9),
 			length: NonZeroUsize::new(2).unwrap(),
 			resolved: false,
-			start_offset: Some(10.into())
+			start_offset: Some(OffsetType::new_unwrap(10))
 		};
 		let right = ScannerCandidate {
-			offset: 8.into(),
+			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(4).unwrap(),
 			resolved: true,
-			start_offset: Some(12.into())
+			start_offset: Some(OffsetType::new_unwrap(12))
 		};
 		left.try_merge_mut(right).unwrap_err();
 		assert_eq!(left.length.get(), 2);
 
 		let mut left = ScannerCandidate {
-			offset: 8.into(),
+			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(2).unwrap(),
 			resolved: false,
 			start_offset: None
 		};
 		let right = ScannerCandidate {
-			offset: 8.into(),
+			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(4).unwrap(),
 			resolved: true,
-			start_offset: Some(12.into())
+			start_offset: Some(OffsetType::new_unwrap(12))
 		};
 		left.try_merge_mut(right).unwrap_err();
 		assert_eq!(left.length.get(), 2);
