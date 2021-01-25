@@ -1,10 +1,14 @@
 use std::iter::Peekable;
 
+/// Merge-sort like merge iterator.
 pub struct MergeIter<T: PartialOrd, A: Iterator<Item = T>, B: Iterator<Item = T>> {
 	a: Peekable<A>,
 	b: Peekable<B>
 }
 impl<T: PartialOrd, A: Iterator<Item = T>, B: Iterator<Item = T>> MergeIter<T, A, B> {
+	/// Creates a new merge iterator.
+	///
+	/// This will only function correctly both `a` and `b` are sorted.
 	pub fn new(a: A, b: B) -> Self {
 		MergeIter {
 			a: a.peekable(),
@@ -40,7 +44,9 @@ impl<T: PartialOrd, A: Iterator<Item = T>, B: Iterator<Item = T>> Iterator for M
 
 		(
 			a_hint.0 + b_hint.0,
-			a_hint.1.and_then(|a| b_hint.1.map(|b| a + b))
+			a_hint.1.and_then(
+				|a| b_hint.1.and_then(|b| a.checked_add(b))
+			)
 		)
 	}
 }

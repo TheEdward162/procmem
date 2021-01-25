@@ -74,8 +74,9 @@ fn main() {
 		// scan the chunk (one or more conscutive pages at once)
 		scanner.scan_once(
 			page.address_range[0],
-			page_buffer.iter().copied(),
-			|offset, len| {
+			page_buffer.iter().copied()
+		).for_each(
+			|(offset, len)| {
 				let relative_offset = offset.get() - page.address_range[0].get();
 				
 				println!(
@@ -87,8 +88,6 @@ fn main() {
 						]
 					).unwrap()
 				);
-
-				true
 			}
 		);
 	}

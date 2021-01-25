@@ -31,13 +31,41 @@ impl ScannerCandidate {
 
 	/// Creates a new instance of scanner candidate that describes a partial candidate.
 	///
-	/// `length` is the length of the would-be match from the beginning to `start_offset`.
-	pub fn partial(start_offset: OffsetType, length: NonZeroUsize) -> Self {
+	/// `length` is the length of the would-be match from `offset` to where the match was found.
+	pub fn partial(offset: OffsetType, length: NonZeroUsize) -> Self {
 		ScannerCandidate {
-			offset: (start_offset.get() - length.get()).into(),
-			length: NonZeroUsize::new(1).unwrap(),
+			offset,
+			length,
 			resolved: false,
-			start_offset: Some(start_offset)
+			start_offset: Some(
+				(offset.get() + length.get() - 1).into()
+			)
+		}
+	}
+
+	/// Creates a new instance of scanner candidate that describes an already resolved candidate.
+	///
+	/// If `length` is None, it is defaulted to one.
+	pub fn resolved(offset: OffsetType, length: Option<NonZeroUsize>) -> Self {
+		ScannerCandidate {
+			offset,
+			length: length.unwrap_or(NonZeroUsize::new(1).unwrap()),
+			resolved: true,
+			start_offset: None
+		}
+	}
+
+	/// Creates a new instance of scanner candidate that describes a partial, resolved candidate.
+	///
+	/// The parameters behave the same as with [`partial`](ScannerCadidate::partial).
+	pub fn partial_resolved(offset: OffsetType, length: NonZeroUsize) -> Self {
+		ScannerCandidate {
+			offset,
+			length,
+			resolved: true,
+			start_offset: Some(
+				(offset.get() + length.get() - 1).into()
+			)
 		}
 	}
 
@@ -72,13 +100,18 @@ impl ScannerCandidate {
 		self.offset().saturating_add(self.length().get())
 	}
 
+	/// Advances the candidate (increases the length).
 	pub fn advance(&mut self) {
+		debug_assert!(!self.resolved);
+
 		unsafe {
 			self.length = NonZeroUsize::new_unchecked(self.length.get() + 1);
 		}
 	}
 
+	/// Resolved this candidate by advancing it one last time and setting the resolved flag.
 	pub fn resolve(&mut self) {
+		self.advance();
 		self.resolved = true;
 	}
 
@@ -139,6 +172,53 @@ mod test {
 	use std::num::NonZeroUsize;
 
 	use super::ScannerCandidate;
+
+	#[test]
+	fn test_scanner_candidate_construction() {
+		let candidate = ScannerCandidate::normal(10.into());
+		assert_eq!(
+			candidate,
+			ScannerCandidate {
+				offset: 10.into(),
+				length: NonZeroUsize::new(1).unwrap(),
+				resolved: false,
+				start_offset: None
+			}
+		);
+
+		let candidate = ScannerCandidate::resolved(20.into(), NonZeroUsize::new(12));
+		assert_eq!(
+			candidate,
+			ScannerCandidate {
+				offset: 20.into(),
+				length: NonZeroUsize::new(12).unwrap(),
+				resolved: true,
+				start_offset: None
+			}
+		);
+
+		let candidate = ScannerCandidate::partial(11.into(), NonZeroUsize::new(5).unwrap());
+		assert_eq!(
+			candidate,
+			ScannerCandidate {
+				offset: 11.into(),
+				length: NonZeroUsize::new(5).unwrap(),
+				resolved: false,
+				start_offset: Some(15.into())
+			}
+		);
+
+		let candidate = ScannerCandidate::partial_resolved(10.into(), NonZeroUsize::new(2).unwrap());
+		assert_eq!(
+			candidate,
+			ScannerCandidate {
+				offset: 10.into(),
+				length: NonZeroUsize::new(2).unwrap(),
+				resolved: true,
+				start_offset: Some(11.into())
+			}
+		);
+	}
 
 	#[test]
 	fn test_scanner_candidate_sort() {

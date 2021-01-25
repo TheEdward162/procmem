@@ -32,6 +32,15 @@ pub trait ScannerPredicate {
 		candidate: &ScannerCandidate
 	) -> UpdateCandidateResult;
 }
+impl<T: ScannerPredicate, U: std::ops::Deref<Target = T>> ScannerPredicate for U {
+	fn try_start_candidate(&self, offset: OffsetType, byte: u8) -> Option<ScannerCandidate> {
+		(**self).try_start_candidate(offset, byte)
+	}
+
+	fn update_candidate(&self, offset: OffsetType, byte: u8, candidate: &ScannerCandidate) -> UpdateCandidateResult {
+		(**self).update_candidate(offset, byte, candidate)
+	}
+}
 
 /// Partial scanner predicate builds on scanner predicate and extends the interface with
 /// partial candidate detection.
@@ -45,4 +54,9 @@ pub trait PartialScannerPredicate: ScannerPredicate {
 	///
 	/// This is only called at the very first byte of each scanned sequence.
 	fn try_start_partial_candidates(&self, offset: OffsetType, byte: u8) -> Vec<ScannerCandidate>;
+}
+impl<T: PartialScannerPredicate, U: std::ops::Deref<Target = T>> PartialScannerPredicate for U {
+	fn try_start_partial_candidates(&self, offset: OffsetType, byte: u8) -> Vec<ScannerCandidate> {
+		(**self).try_start_partial_candidates(offset, byte)
+	}
 }
