@@ -93,6 +93,6 @@ fn main() {
 	}
 
 	// finally unlock the memory so that the process gets unfrozen
-	// if we didn't call this `memory_access` would call it on drop anyway, but it's good practice to call it explicitly
+	// if we don't call this `memory_access` would unlock on drop anyway, but it's good practice to call it explicitly
 	memory_access.unlock().expect("could not unlock memory access");
 }

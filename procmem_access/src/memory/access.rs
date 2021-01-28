@@ -6,6 +6,8 @@ use crate::common::OffsetType;
 pub enum LockError {
 	#[error("ptrace(PTRACE_ATTACH) failed")]
 	PtraceError(std::io::Error),
+	#[error("kill(SIGSTOP) failed")]
+	SigstopError(std::io::Error),
 	#[error("waitpid failed")]
 	WaitpidError(std::io::Error)
 }
@@ -22,7 +24,7 @@ pub enum ExclusiveLockError {
 pub enum UnlockError {
 	#[error("process is not locked")]
 	NotLocked,
-	#[error("ptrace(PTRACE_DETACH) failed")]
+	#[error("ptrace(PTRACE_CONT) failed")]
 	PtraceError(std::io::Error)
 }
 

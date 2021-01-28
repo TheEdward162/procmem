@@ -20,11 +20,21 @@ use crate::{
 #[derive(Debug, Error)]
 pub enum ProcfsAccessOpenError {
 	#[error("could not open memory file")]
-	MemoryIo(#[from] std::io::Error)
+	MemoryIo(std::io::Error),
+	#[error("ptrace(PTRACE_ATTACH) failed")]
+	PtraceError(std::io::Error),
+	#[error("waitpid failed")]
+	WaitpidError(std::io::Error)
 }
 
+/// Procfs implementation of memory access.
+///
+/// Uses `ptrace` to lock (stop) the process. Ptrace is attached only the first time a lock is acquired, not when the process is opened.
+///
+/// Ptrace is detached on drop.
 pub struct ProcfsAccess {
 	pid: libc::pid_t,
+	ptrace_attached: bool,
 	ptrace_lock: usize,
 	mem: File
 }
@@ -33,6 +43,9 @@ impl ProcfsAccess {
 		format!("/proc/{}/mem", pid).into()
 	}
 
+	/// Opens a process with given `pid`.
+	///
+	/// The process memory access file is located in `/proc/[pid]/mem`.
 	pub fn open(pid: libc::pid_t) -> Result<Self, ProcfsAccessOpenError> {
 		let path = Self::mem_path(pid);
 
@@ -44,18 +57,38 @@ impl ProcfsAccess {
 
 		Ok(ProcfsAccess {
 			pid,
+			ptrace_attached: false,
 			ptrace_lock: 0,
 			mem
 		})
 	}
 
-	/// ## Safety
-	/// * ?? maybe it doesn't need to be unsafe?
 	unsafe fn ptrace_attach(&mut self) -> Result<(), LockError> {
+		debug_assert!(!self.ptrace_attached);
+		
 		if libc::ptrace(libc::PTRACE_ATTACH, self.pid, 0, 0) != 0 {
 			return Err(LockError::PtraceError(std::io::Error::last_os_error()))
 		}
 
+		// wait until the signal is delivered
+		let waitpid_res = libc::waitpid(self.pid, std::ptr::null_mut(), 0);
+		if waitpid_res == -1 {
+			return Err(LockError::WaitpidError(std::io::Error::last_os_error()))
+		}
+		debug_assert_eq!(waitpid_res, self.pid);
+
+		self.ptrace_attached = true;
+
+		Ok(())
+	}
+
+	unsafe fn ptrace_stop(&mut self) -> Result<(), LockError> {
+		if libc::kill(self.pid, libc::SIGSTOP) != 0 {
+			return Err(LockError::SigstopError(std::io::Error::last_os_error()))
+		}
+
+		// wait until the signal is delivered
+		// TODO: read the manpage
 		let waitpid_res = libc::waitpid(self.pid, std::ptr::null_mut(), 0);
 		if waitpid_res == -1 {
 			return Err(LockError::WaitpidError(std::io::Error::last_os_error()))
@@ -65,21 +98,36 @@ impl ProcfsAccess {
 		Ok(())
 	}
 
-	/// ## Safety
-	/// * ?? maybe it doesn't need to be unsafe?
+	unsafe fn ptrace_cont(&mut self) -> Result<(), UnlockError> {
+		if libc::ptrace(libc::PTRACE_CONT, self.pid, 0, 0) != 0 {
+			return Err(UnlockError::PtraceError(std::io::Error::last_os_error()))
+		}
+
+		Ok(())
+	}
+
 	unsafe fn ptrace_detach(&mut self) -> Result<(), UnlockError> {
+		debug_assert!(self.ptrace_attached);
+
 		if libc::ptrace(libc::PTRACE_DETACH, self.pid, 0, 0) != 0 {
 			return Err(UnlockError::PtraceError(std::io::Error::last_os_error()))
 		}
+		self.ptrace_attached = false;
 
 		Ok(())
 	}
 }
 impl MemoryAccess for ProcfsAccess {
 	fn lock(&mut self) -> Result<bool, LockError> {
-		let result = if self.ptrace_lock == 0 {
+		let result = if !self.ptrace_attached {
 			unsafe {
 				self.ptrace_attach()?;
+			}
+
+			true
+		} else if self.ptrace_lock == 0 {
+			unsafe {
+				self.ptrace_stop()?;
 			}
 
 			true
@@ -93,9 +141,7 @@ impl MemoryAccess for ProcfsAccess {
 
 	fn lock_exlusive(&mut self) -> Result<(), ExclusiveLockError> {
 		if self.ptrace_lock == 0 {
-			unsafe {
-				self.ptrace_attach()?;
-			}
+			self.lock()?;
 		} else {
 			return Err(ExclusiveLockError::AlreadyLocked)
 		}
@@ -111,7 +157,7 @@ impl MemoryAccess for ProcfsAccess {
 		self.ptrace_lock -= 1;
 		if self.ptrace_lock == 0 {
 			unsafe {
-				self.ptrace_detach()?;
+				self.ptrace_cont()?;
 			}
 
 			Ok(true)
@@ -138,8 +184,17 @@ impl MemoryAccess for ProcfsAccess {
 }
 impl Drop for ProcfsAccess {
 	fn drop(&mut self) {
-		if self.ptrace_lock > 0 {
-			unsafe { self.ptrace_detach().unwrap() }
+		if self.ptrace_attached {
+			if self.ptrace_lock == 0 {
+				// need to stop the process to detach from it, weirdly
+				unsafe {
+					self.ptrace_stop().unwrap();
+				}
+			}
+
+			unsafe {
+				self.ptrace_detach().unwrap();
+			}
 		}
 	}
 }
