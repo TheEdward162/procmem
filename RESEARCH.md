@@ -20,6 +20,10 @@ https://linux.die.net/man/2/ptrace
 
 https://man7.org/linux/man-pages/man2/process_vm_readv.2.html
 
+### match vm info
+
+https://developer.apple.com/documentation/kernel/mach/mach_vm
+
 ## Prior work
 
 https://github.com/Tommoa/rs-process-memory/blob/master/src/linux.rs

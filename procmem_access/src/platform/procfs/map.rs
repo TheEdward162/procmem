@@ -31,7 +31,7 @@ impl ProcfsMemoryMap {
 		format!("/proc/{}/maps", pid).into()
 	}
 
-	pub fn load(pid: libc::pid_t) -> Result<Self, ProcfsMemoryMapLoadError> {
+	pub fn new(pid: libc::pid_t) -> Result<Self, ProcfsMemoryMapLoadError> {
 		let path = Self::map_path(pid);
 
 		let mut offset_map = HashMap::new();

@@ -96,7 +96,7 @@ impl std::fmt::Display for MemoryPageType {
 pub struct MemoryPage {
 	pub address_range: [OffsetType; 2],
 	pub permissions: MemoryPagePermissions,
-	pub offset: usize,
+	pub offset: u64,
 	pub page_type: MemoryPageType
 }
 impl MemoryPage {

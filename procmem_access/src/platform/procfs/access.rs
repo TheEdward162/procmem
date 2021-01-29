@@ -15,7 +15,7 @@ use crate::{
 };
 
 #[derive(Debug, Error)]
-pub enum ProcfsAccessOpenError {
+pub enum ProcfsAccessError {
 	#[error("could not open memory file")]
 	MemoryIo(std::io::Error)
 }
@@ -38,14 +38,14 @@ impl ProcfsAccess {
 	/// Opens a process with given `pid`.
 	///
 	/// The process memory access file is located in `/proc/[pid]/mem`.
-	pub fn open(pid: libc::pid_t) -> Result<Self, ProcfsAccessOpenError> {
+	pub fn new(pid: libc::pid_t) -> Result<Self, ProcfsAccessError> {
 		let path = Self::mem_path(pid);
 
 		let mem = OpenOptions::new()
 			.read(true)
 			.write(true)
 			.open(path)
-			.map_err(|err| ProcfsAccessOpenError::MemoryIo(err))?;
+			.map_err(|err| ProcfsAccessError::MemoryIo(err))?;
 
 		Ok(ProcfsAccess {
 			pid,
@@ -70,4 +70,3 @@ impl MemoryAccess for ProcfsAccess {
 		Ok(())
 	}
 }
-

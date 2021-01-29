@@ -14,8 +14,8 @@ mod inner {
 #[cfg(target_os = "macos")]
 mod inner {
 	pub type SimpleMemoryLock = super::super::ptrace::PtraceLock;
-	pub type SimpleMemoryAccess = ();
-	pub type SimpleMemoryMap = ();
+	pub type SimpleMemoryAccess = super::super::mach::MachAccess;
+	pub type SimpleMemoryMap = super::super::mach::MachMemoryMap;
 }
 
 #[cfg(target_os = "windows")]

@@ -28,7 +28,7 @@ impl<T: AsRawBytes> ValuePredicate<T> {
 	}
 
 	fn offset_aligned(&self, offset: OffsetType) -> bool {
-		!self.aligned || (offset.get() % T::align_of()) == 0
+		!self.aligned || (offset.get() % T::align_of() as u64) == 0
 	}
 }
 impl<T: AsRawBytes> ScannerPredicate for ValuePredicate<T> {
@@ -86,7 +86,7 @@ impl<T: AsRawBytes> PartialScannerPredicate for ValuePredicate<T> {
 				continue
 			}
 
-			let potential_start_offset = match offset.get().saturating_sub(i) {
+			let potential_start_offset = match offset.get().saturating_sub(i as u64) {
 				// skip this candidate if it would start at a non-positive offset
 				// even though starting at offset 1 is also pretty unreal, it is not against our invariants
 				0 => continue,

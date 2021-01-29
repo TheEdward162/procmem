@@ -38,7 +38,7 @@ impl ScannerCandidate {
 			length,
 			resolved: false,
 			start_offset: Some(
-				OffsetType::new_unwrap(offset.get() + length.get() - 1)
+				OffsetType::new_unwrap(offset.get() + length.get() as u64 - 1)
 			)
 		}
 	}
@@ -93,7 +93,7 @@ impl ScannerCandidate {
 	}
 
 	pub const fn end_offset(&self) -> OffsetType {
-		self.offset().saturating_add(self.length().get())
+		self.offset().saturating_add(self.length().get() as u64)
 	}
 
 	/// Advances the candidate (increases the length).

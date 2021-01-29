@@ -1,6 +1,6 @@
 //! Common definitions used across this library.
 
-use std::num::NonZeroUsize;
+use std::num::NonZeroU64;
 use std::convert::TryFrom;
 
 /// Type to represent the offset of the address space.
@@ -8,49 +8,42 @@ use std::convert::TryFrom;
 /// This is basically the native pointer type, and we also assume it cannot be null.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 #[repr(transparent)]
-pub struct OffsetType(NonZeroUsize);
+pub struct OffsetType(NonZeroU64);
 impl OffsetType {
-	pub fn new(offset: usize) -> Option<Self> {
+	pub fn new(offset: u64) -> Option<Self> {
 		Some(
 			OffsetType(
-				NonZeroUsize::new(offset)?
+				NonZeroU64::new(offset)?
 			)
 		)
 	}
 
-	pub fn new_unwrap(offset: usize) -> Self {
+	pub fn new_unwrap(offset: u64) -> Self {
 		Self::new(offset).expect("offset cannot be zero because it represents a valid pointer")
 	}
 
-	pub fn try_new(offset: usize) -> Option<Self> {
-		match NonZeroUsize::new(offset) {
-			None => None,
-			Some(n) => Some(Self(n))
-		}
-	}
-
-	pub const fn get(&self) -> usize {
+	pub const fn get(&self) -> u64 {
 		self.0.get()
 	}
 
-	pub const fn saturating_add(&self, rhs: usize) -> OffsetType {
+	pub const fn saturating_add(&self, rhs: u64) -> OffsetType {
 		// Safe because we use saturating addition on one positive and non-negative number
-		let value = unsafe { NonZeroUsize::new_unchecked(self.0.get().saturating_add(rhs)) };
+		let value = unsafe { NonZeroU64::new_unchecked(self.0.get().saturating_add(rhs)) };
 
 		OffsetType(value)
 	}
 }
-impl TryFrom<usize> for OffsetType {
+impl TryFrom<u64> for OffsetType {
 	type Error = std::num::TryFromIntError;
 
-	fn try_from(value: usize) -> Result<Self, Self::Error> {
+	fn try_from(value: u64) -> Result<Self, Self::Error> {
 		Ok(
-			OffsetType::from(NonZeroUsize::try_from(value)?)
+			OffsetType::from(NonZeroU64::try_from(value)?)
 		)
 	}
 }
-impl From<NonZeroUsize> for OffsetType {
-	fn from(offset: NonZeroUsize) -> Self {
+impl From<NonZeroU64> for OffsetType {
+	fn from(offset: NonZeroU64) -> Self {
 		OffsetType(offset)
 	}
 }
