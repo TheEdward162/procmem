@@ -22,9 +22,7 @@ pub enum ProcfsMemoryMapLoadError {
 pub struct ProcfsMemoryMap {
 	#[allow(dead_code)]
 	pid: libc::pid_t,
-	page_size: u64,
-	pages: Vec<MemoryPage>,
-	offset_map: HashMap<OffsetType, usize>
+	pages: Vec<MemoryPage>
 }
 impl ProcfsMemoryMap {
 	pub fn map_path(pid: libc::pid_t) -> std::path::PathBuf {
@@ -49,23 +47,14 @@ impl ProcfsMemoryMap {
 		for line in buffer.lines() {
 			let page = Self::parse_map_line(line, exe_path.as_deref())?;
 
-			offset_map.insert(page.address_range[0], pages.len());
 			pages.push(page);
 		}
 
 		Ok(ProcfsMemoryMap {
 			pid,
-			page_size: unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as u64,
 			pages,
 			offset_map
 		})
-	}
-
-	fn page_start(&self, offset: OffsetType) -> Option<OffsetType> {
-		let offset = offset.get();
-		let page_offset = (offset as u64 % self.page_size) as usize;
-
-		OffsetType::try_new(offset - page_offset)
 	}
 
 	fn parse_page_permissions(
@@ -168,12 +157,6 @@ impl ProcfsMemoryMap {
 impl MemoryMap for ProcfsMemoryMap {
 	fn pages(&self) -> &[MemoryPage] {
 		&self.pages
-	}
-
-	fn page(&self, offset: OffsetType) -> Option<&MemoryPage> {
-		self.page_start(offset)
-			.and_then(|start| self.offset_map.get(&start))
-			.map(|&i| &self.pages[i])
 	}
 }
 

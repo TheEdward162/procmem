@@ -1,9 +1,3 @@
-use std::{
-	collections::HashMap,
-	fs::{self, OpenOptions},
-	io::Read
-};
-
 use thiserror::Error;
 
 use mach::{
@@ -27,7 +21,6 @@ pub enum MachMemoryMapError {
 }
 
 pub struct MachMemoryMap {
-	page_size: u64,
 	pages: Vec<MemoryPage>,
 }
 impl MachMemoryMap {
@@ -43,8 +36,6 @@ impl MachMemoryMap {
 
 		Ok(
 			MachMemoryMap {
-				// TODO:
-				page_size: 0,
 				pages
 			}
 		)
@@ -98,7 +89,7 @@ impl MachMemoryMap {
 				info.shared != 0
 			),
 			offset: info.offset,
-			// TODO: This info can probably be retrieved from somewhere
+			// TODO: This info can probably be retrieved from somewhere, maybe `object_name`?
 			page_type: MemoryPageType::Unknown
 		};
 		
@@ -108,12 +99,5 @@ impl MachMemoryMap {
 impl MemoryMap for MachMemoryMap {
 	fn pages(&self) -> &[MemoryPage] {
 		&self.pages
-	}
-
-	fn page(&self, offset: OffsetType) -> Option<&MemoryPage> {
-		// self.page_start(offset)
-		// 	.and_then(|start| self.offset_map.get(&start))
-		// 	.map(|&i| &self.pages[i])
-		todo!()
 	}
 }

@@ -145,12 +145,19 @@ impl std::fmt::Display for MemoryPage {
 	}
 }
 
+/// Trait for objects that serve as memory map storages.
+///
+/// The `containing_page` should only be implemented if the implementation can provide a more efficient search behavior.
 pub trait MemoryMap {
 	/// Returns an ordered slice of memory pages.
 	fn pages(&self) -> &[MemoryPage];
 
-	/// Returns the mapped memory page within which the given offset falls.
-	fn page(&self, offset: OffsetType) -> Option<&MemoryPage>;
+	/// Returns the mapped memory page which contains the given offset.
+	fn containing_page(&self, offset: OffsetType) -> Option<&MemoryPage> {
+		self.pages().iter().find(
+			|&p| offset >= p.address_range[0] && offset <= p.address_range[1]
+		)
+	}
 }
 
 #[cfg(test)]
