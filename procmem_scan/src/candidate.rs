@@ -100,6 +100,7 @@ impl ScannerCandidate {
 	pub fn advance(&mut self) {
 		debug_assert!(!self.resolved);
 
+		// if this overflows we'll be sad anyway
 		unsafe {
 			self.length = NonZeroUsize::new_unchecked(self.length.get() + 1);
 		}

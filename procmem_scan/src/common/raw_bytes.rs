@@ -22,6 +22,8 @@ macro_rules! impl_as_raw_bytes {
 	) => {
 		unsafe impl AsRawBytes for $raw_type {
 			fn as_raw_bytes(&self) -> &[u8] {
+				// the safety requirements of this trait should ensure that
+				// it is not UB to read the raw bytes covered by this type
 				unsafe {
 					std::slice::from_raw_parts(
 						self as *const $raw_type as *const u8,

@@ -61,6 +61,8 @@ fn main() {
 		chunk_buffer.resize((page.address_range[1].get() - page.address_range[0].get()) as usize, 0);
 		eprintln!("Reading page {}", page);
 		// Safe becasue the process is locked and thus cannot change until we unlock it
+		// although even if we don't lock it, it should be ok to _read_ the memory
+		// there just migh be a data race
 		unsafe {
 			match memory_access.read(
 				page.address_range[0],

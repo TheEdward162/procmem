@@ -60,7 +60,9 @@ impl<T, F: FnMut(&mut Option<T>, T) -> Option<T>> AccFilter<T, std::iter::Empty<
 		let mut acc = None;
 		let mut write_index = 0;
 		for read_index in 0 .. vec_len {
+			// move a value out of the vector
 			// safe because the vec already fulfills the requirements 
+			// and because we `set_len(0)` panics don't cause a double-drop
 			let value = unsafe {
 				std::ptr::read(
 					vec_ptr.add(read_index)
@@ -70,7 +72,9 @@ impl<T, F: FnMut(&mut Option<T>, T) -> Option<T>> AccFilter<T, std::iter::Empty<
 			match fun(&mut acc, value) {
 				None => (),
 				Some(value) => {
-					// safe because the vec already fulfills the requirements
+					// move the produced value into the vector
+					// safe because the closure can never produce more elements than it receives
+					// (plus the one in acc handled later)
 					unsafe {
 						std::ptr::write(
 							vec_ptr.add(write_index),
@@ -83,7 +87,7 @@ impl<T, F: FnMut(&mut Option<T>, T) -> Option<T>> AccFilter<T, std::iter::Empty<
 		}
 
 		if let Some(acc) = acc {
-			// safe because we reserved the length
+			// safe because we reserved the length + 1
 			unsafe {
 				std::ptr::write(vec_ptr.add(write_index), acc);
 			}
