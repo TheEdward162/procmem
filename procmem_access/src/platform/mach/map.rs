@@ -60,6 +60,8 @@ impl MachMemoryMap {
 		let mut info_count = vm_region_basic_info_64::count();
 		let mut object_name: mach_port_t = Default::default();
 
+		// TODO: I could not find any documentation, so this code is
+		// just a best-effort guess, I don't really know how unsafe it is
 		let res = unsafe {
 			mach::vm::mach_vm_region(
 				port,
@@ -73,6 +75,8 @@ impl MachMemoryMap {
 		};
 
 		if object_name != MACH_PORT_NULL {
+			// TODO: Documentation would probably reveal what this is and why it is necessary
+			// until then, I'll just believe the internet
 			unsafe {
 				let res = mach_port_deallocate(port, object_name);
 				debug_assert_eq!(res, KERN_SUCCESS);

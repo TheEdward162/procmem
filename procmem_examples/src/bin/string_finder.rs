@@ -33,7 +33,7 @@ fn main() {
 
 	// create and lock the memory lock so that the process gets frozen and we don't have races
 	let mut memory_lock = SimpleMemoryLock::new(pid);
-	// memory_lock.lock().expect("could not lock process memory");
+	memory_lock.lock().expect("could not lock process memory");
 
 	// load up the memory map of the process
 	let memory_map = SimpleMemoryMap::new(pid).expect("could not read memory map");
@@ -58,6 +58,8 @@ fn main() {
 		chunk_buffer.resize((page.address_range[1].get() - page.address_range[0].get()) as usize, 0);
 		eprintln!("Reading page {}", page);
 		// Safe becasue the process is locked and thus cannot change until we unlock it
+		// although even if we don't lock it, it should be ok to _read_ the memory
+		// there just migh be a data race
 		unsafe {
 			match memory_access.read(
 				page.address_range[0],
@@ -95,5 +97,5 @@ fn main() {
 
 	// finally unlock the memory so that the process gets unfrozen
 	// if we don't call this `memory_lock` would unlock on drop anyway, but it's good practice to call it explicitly
-	// memory_lock.unlock().expect("could not unlock memory access");
+	memory_lock.unlock().expect("could not unlock memory access");
 }
