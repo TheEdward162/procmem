@@ -7,7 +7,7 @@
 #[cfg(target_os = "linux")]
 mod inner {
 	pub type SimpleMemoryLock = super::super::ptrace::PtraceLock;
-	pub type SimpleMemoryAccess = super::super::procfs::ProcfsMemoryAccess;
+	pub type SimpleMemoryAccess = super::super::procfs::ProcfsAccess;
 	pub type SimpleMemoryMap = super::super::procfs::ProcfsMemoryMap;
 }
 

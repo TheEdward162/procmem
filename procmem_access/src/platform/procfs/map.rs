@@ -63,9 +63,9 @@ impl ProcfsMemoryMap {
 
 	fn page_start(&self, offset: OffsetType) -> Option<OffsetType> {
 		let offset = offset.get();
-		let page_offset = (offset as u64 % self.page_size) as usize;
+		let page_offset = offset % self.page_size;
 
-		OffsetType::try_new(offset - page_offset)
+		OffsetType::new(offset - page_offset)
 	}
 
 	fn parse_page_permissions(
@@ -129,13 +129,13 @@ impl ProcfsMemoryMap {
 			.next()
 			.ok_or(MemoryPageParseError::InvalidRange)?
 			.split('-');
-		let from = usize::from_str_radix(
+		let from = u64::from_str_radix(
 			range_split
 				.next()
 				.ok_or(MemoryPageParseError::InvalidRange)?,
 			16
 		)?;
-		let to = usize::from_str_radix(
+		let to = u64::from_str_radix(
 			range_split
 				.next()
 				.ok_or(MemoryPageParseError::InvalidRange)?,
@@ -150,7 +150,7 @@ impl ProcfsMemoryMap {
 		let offset = split
 			.next()
 			.ok_or(MemoryPageParseError::InvalidOffset)?
-			.parse::<usize>()?;
+			.parse::<u64>()?;
 
 		let page_type = Self::parse_page_type(
 			split.next().ok_or(MemoryPageParseError::InvalidEntry)?,

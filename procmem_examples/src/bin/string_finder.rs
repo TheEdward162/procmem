@@ -33,7 +33,7 @@ fn main() {
 
 	// create and lock the memory lock so that the process gets frozen and we don't have races
 	let mut memory_lock = SimpleMemoryLock::new(pid);
-	// memory_lock.lock().expect("could not lock process memory");
+	memory_lock.lock().expect("could not lock process memory");
 
 	// load up the memory map of the process
 	let memory_map = SimpleMemoryMap::new(pid).expect("could not read memory map");
@@ -46,7 +46,10 @@ fn main() {
 	let pages = MemoryPage::merge_sorted(
 		memory_map.pages().iter().filter(
 			|page| page.permissions.read() && match page.page_type {
-				MemoryPageType::ProcessExecutable(_) | MemoryPageType::Unknown => true,
+				MemoryPageType::ProcessExecutable(_) => true,
+				// TODO: macos memory map detection currently cannot categorize pages
+				#[cfg(target_os = "macos")]
+				MemoryPageType::Unknown => true,
 				_ => false
 			}
 		).cloned()
@@ -95,5 +98,5 @@ fn main() {
 
 	// finally unlock the memory so that the process gets unfrozen
 	// if we don't call this `memory_lock` would unlock on drop anyway, but it's good practice to call it explicitly
-	// memory_lock.unlock().expect("could not unlock memory access");
+	memory_lock.unlock().expect("could not unlock memory access");
 }
