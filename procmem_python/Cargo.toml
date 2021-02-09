@@ -1,0 +1,12 @@
+[package]
+name = "procmem_python"
+version = "0.1.0"
+authors = ["TheEdward162 <thedward162@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+procmem_access = { path = "../procmem_access" }
+pyo3 = { version = "0.13", default-features = false, features = ["macros", "extension-module"] }
