@@ -1,7 +1,6 @@
 use thiserror::Error;
 
 use mach::{
-	port::mach_port_name_t,
 	kern_return::KERN_SUCCESS
 };
 
@@ -23,11 +22,11 @@ pub enum MachAccessError {
 pub struct MachAccess {
 	#[allow(dead_code)]
 	pid: libc::pid_t,
-	port: mach_port_name_t
+	port: super::TaskPort
 }
 impl MachAccess {
 	pub fn new(pid: libc::pid_t) -> Result<Self, MachAccessError> {
-		let port = super::get_pid_port(pid).map_err(MachAccessError::PortError)?;
+		let port = super::TaskPort::new(pid).map_err(MachAccessError::PortError)?;
 		
 		Ok(
 			MachAccess {
@@ -41,7 +40,7 @@ impl MemoryAccess for MachAccess {
 	unsafe fn read(&mut self, offset: OffsetType, buffer: &mut [u8]) -> Result<(), ReadError> {
 		let mut read_len: u64 = 0;
         let res = mach::vm::mach_vm_read_overwrite(
-			self.port,
+			self.port.get(),
 			offset.get(),
 			buffer.len() as u64,
 			buffer.as_mut_ptr() as u64,
@@ -62,7 +61,7 @@ impl MemoryAccess for MachAccess {
 
 	unsafe fn write(&mut self, offset: OffsetType, data: &[u8]) -> Result<(), WriteError> {
 		let res = mach::vm::mach_vm_write(
-			self.port,
+			self.port.get(),
 			offset.get(),
 			data.as_ptr() as usize,
 			data.len() as u32

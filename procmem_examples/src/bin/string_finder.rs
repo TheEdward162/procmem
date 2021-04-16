@@ -9,7 +9,7 @@ use procmem_scan::prelude::{
 	ValuePredicate, StreamScanner
 };
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// simple cli parse
 	let (needle, pid) = {
 		let mut it = std::env::args().skip(1);
@@ -27,19 +27,15 @@ fn main() {
 	eprintln!("needle: {}", needle);
 	eprintln!("pid: {}", pid);
 
-	// define what to scan for
-	let predicate = ValuePredicate::new(needle, true);
-	let mut scanner = StreamScanner::new(predicate);
-
 	// create and lock the memory lock so that the process gets frozen and we don't have races
-	let mut memory_lock = SimpleMemoryLock::new(pid);
-	memory_lock.lock().expect("could not lock process memory");
+	let mut memory_lock = SimpleMemoryLock::new(pid)?;
+	memory_lock.lock()?;
 
 	// load up the memory map of the process
-	let memory_map = SimpleMemoryMap::new(pid).expect("could not read memory map");
+	let memory_map = SimpleMemoryMap::new(pid)?;
 
 	// create memory access so we can read the memory
-	let mut memory_access = SimpleMemoryAccess::new(pid).expect("could not open process memory");
+	let mut memory_access = SimpleMemoryAccess::new(pid)?;
 
 	// filter pages to only include the original process executable (arbitrary filter).
 	// and run it through `MemoryPage::merge_sorted` so that consecutive pages get merged into one 
@@ -53,7 +49,11 @@ fn main() {
 				_ => false
 			}
 		).cloned()
-	);
+	).take(2);
+
+	// define what to scan for
+	let predicate = ValuePredicate::new(needle, true);
+	let mut scanner = StreamScanner::new(predicate);
 
 	// for each page, read it into the buffer then scan the chunk
 	let mut chunk_buffer = Vec::new();
@@ -100,5 +100,13 @@ fn main() {
 
 	// finally unlock the memory so that the process gets unfrozen
 	// if we don't call this `memory_lock` would unlock on drop anyway, but it's good practice to call it explicitly
-	memory_lock.unlock().expect("could not unlock memory access");
+	memory_lock.unlock()?;
+
+	// eprintln!("Debug");
+	// memory_lock.lock().expect("could not lock second time");
+	// eprintln!("Debug 2");
+	// memory_lock.unlock().expect("could not unlock second time");
+	// eprintln!("Debug 3");
+
+	Ok(())
 }
