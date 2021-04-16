@@ -26,7 +26,17 @@ https://web.mit.edu/darwin/src/modules/xnu/osfmk/man/vm_region.html
 
 https://developer.apple.com/documentation/kernel/mach/mach_vm
 
+ptrace research:
+
+https://alexomara.com/blog/defeating-anti-debug-techniques-macos-ptrace-variants/
+
+https://www.spaceflint.com/?p=150
+
+https://web.mit.edu/darwin/src/modules/xnu/osfmk/man/mach_msg.html
+
 ### mach kernel
+
+https://github.com/opensource-apple/xnu
 
 May or may not apply to macOS mach kernel:
 

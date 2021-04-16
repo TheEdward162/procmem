@@ -25,11 +25,11 @@ pub struct MachMemoryMap {
 }
 impl MachMemoryMap {
 	pub fn new(pid: libc::pid_t) -> Result<Self, MachMemoryMapError> {
-		let port = super::get_pid_port(pid).map_err(MachMemoryMapError::PortError)?;
+		let port = super::TaskPort::new(pid).map_err(MachMemoryMapError::PortError)?;
 		let mut pages = Vec::new();
 
 		let mut previous_address = 0;
-		while let Some(page) = Self::enumerate_next_page(port, previous_address) {
+		while let Some(page) = Self::enumerate_next_page(port.get(), previous_address) {
 			previous_address = page.address_range[1].get();
 			pages.push(page);
 		}

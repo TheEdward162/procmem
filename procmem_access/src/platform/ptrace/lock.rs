@@ -9,18 +9,30 @@ use crate::{
 	}
 };
 
+#[cfg(target_os = "macos")]
+use crate::platform::mach::exception::{MachExceptionHandler, MachExceptionHandlerError};
+
 #[derive(Debug, Error)]
 pub enum PtraceLockError {
 	#[error("ptrace attach failed")]
 	PtraceAttach(std::io::Error),
 	#[error("kill(SIGSTOP) failed")]
 	SigstopError(std::io::Error),
-	#[error("waitpid failed")]
-	WaitpidError(std::io::Error),
 	#[error("ptrace continue failed")]
 	PtraceCont(std::io::Error),
 	#[error("ptrace detach failed")]
-	PtraceDetach(std::io::Error)
+	PtraceDetach(std::io::Error),
+	
+	#[cfg(target_os = "linux")]
+	#[error("waitpid failed")]
+	WaitpidError(std::io::Error),
+
+	#[cfg(target_os = "macos")]
+	#[error("failed to initialize mach exception port")]
+	ExceptionPortError(std::io::Error),
+	#[cfg(target_os = "macos")]
+	#[error("failed to receive mach exceptions")]
+	ExceptionRecvError(std::io::Error),
 }
 impl From<PtraceLockError> for LockError {
 	fn from(err: PtraceLockError) -> Self {
@@ -37,16 +49,54 @@ pub struct PtraceLock {
 	pid: libc::pid_t,
 	ptrace_attached: bool,
 	ptrace_lock: usize,
+
+	#[cfg(target_os = "macos")]
+	exception_handler: MachExceptionHandler
 }
+#[cfg(target_os = "linux")]
 impl PtraceLock {
-	pub fn new(pid: libc::pid_t) -> Self {
-		PtraceLock {
-			pid,
-			ptrace_attached: false,
-			ptrace_lock: 0
-		}
+	pub fn new(pid: libc::pid_t) -> Result<Self, std::convert::Infallible> {
+		Ok(
+			PtraceLock {
+				pid,
+				ptrace_attached: false,
+				ptrace_lock: 0
+			}
+		)
 	}
 
+	unsafe fn wait_for_stop(&mut self) -> Result<(), PtraceLockError> {
+		// wait until the stop signal is delivered
+		// TODO: read the manpage and check how to properly use this
+		let waitpid_res = libc::waitpid(self.pid, std::ptr::null_mut(), 0);
+		if waitpid_res == -1 {
+			return Err(PtraceLockError::WaitpidError(std::io::Error::last_os_error()))
+		}
+		debug_assert_eq!(waitpid_res, self.pid);
+	}
+}
+#[cfg(target_os = "macos")]
+impl PtraceLock {
+	pub fn new(pid: libc::pid_t) -> Result<Self, MachExceptionHandlerError> {
+		Ok(
+			PtraceLock {
+				pid,
+				ptrace_attached: false,
+				ptrace_lock: 0,
+				exception_handler: MachExceptionHandler::new(pid)?
+			}
+		)
+	}
+
+	unsafe fn wait_for_stop(&mut self) -> Result<(), PtraceLockError> {
+		while let Some(message) = self.exception_handler.try_receive() {
+			dbg!(message);
+		}
+		
+		Ok(())
+	}
+}
+impl PtraceLock {
 	unsafe fn ptrace_attach(&mut self) -> Result<(), PtraceLockError> {
 		debug_assert!(!self.ptrace_attached);
 
@@ -59,12 +109,7 @@ impl PtraceLock {
 			return Err(PtraceLockError::PtraceAttach(std::io::Error::last_os_error()))
 		}
 
-		// wait until the signal is delivered
-		let waitpid_res = libc::waitpid(self.pid, std::ptr::null_mut(), 0);
-		if waitpid_res == -1 {
-			return Err(PtraceLockError::WaitpidError(std::io::Error::last_os_error()))
-		}
-		debug_assert_eq!(waitpid_res, self.pid);
+		self.wait_for_stop()?;
 
 		self.ptrace_attached = true;
 
@@ -76,13 +121,7 @@ impl PtraceLock {
 			return Err(PtraceLockError::SigstopError(std::io::Error::last_os_error()))
 		}
 
-		// wait until the signal is delivered
-		// TODO: read the manpage and check how to properly use this
-		let waitpid_res = libc::waitpid(self.pid, std::ptr::null_mut(), 0);
-		if waitpid_res == -1 {
-			return Err(PtraceLockError::WaitpidError(std::io::Error::last_os_error()))
-		}
-		debug_assert_eq!(waitpid_res, self.pid);
+		self.wait_for_stop()?;
 
 		Ok(())
 	}
@@ -91,7 +130,7 @@ impl PtraceLock {
 		#[cfg(target_os = "linux")]
 		let ptrace_res = libc::ptrace(libc::PTRACE_CONT, self.pid, 0, 0);
 		#[cfg(target_os = "macos")]
-		let ptrace_res = libc::ptrace(libc::PT_CONTINUE, self.pid, std::ptr::null_mut(), 0);
+		let ptrace_res = libc::ptrace(libc::PT_CONTINUE, self.pid, 1 as *mut i8, 0);
 
 		if ptrace_res != 0 {
 			return Err(PtraceLockError::PtraceCont(std::io::Error::last_os_error()))
