@@ -8,3 +8,6 @@ publish = false
 [dependencies]
 procmem_access = { path = "../procmem_access" }
 procmem_scan = { path = "../procmem_scan" }
+
+anyhow = "1"
+rustyline = "11"

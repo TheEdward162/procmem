@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	).take(2);
 
 	// define what to scan for
-	let predicate = ValuePredicate::new(needle, true);
+	let predicate = ValuePredicate::new(needle.as_str(), true);
 	let mut scanner = StreamScanner::new(predicate);
 
 	// for each page, read it into the buffer then scan the chunk

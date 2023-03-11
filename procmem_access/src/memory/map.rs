@@ -130,6 +130,18 @@ impl MemoryPage {
 			}
 		})
 	}
+
+	pub const fn start(&self) -> OffsetType {
+		self.address_range[0]
+	}
+
+	pub const fn end(&self) -> OffsetType {
+		self.address_range[1]
+	}
+
+	pub const fn size(&self) -> usize {
+		(self.end().get() - self.start().get()) as usize
+	}
 }
 impl std::fmt::Display for MemoryPage {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

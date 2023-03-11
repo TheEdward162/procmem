@@ -2,16 +2,10 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum LockError {
-	#[error("platform specific error: {0}")]
-	PlatformError(Box<dyn std::error::Error>)
-}
-
-#[derive(Debug, Error)]
-pub enum ExclusiveLockError {
-	#[error("process is already locked")]
+	#[error("process is already locked exclusively")]
 	AlreadyLocked,
-	#[error(transparent)]
-	LockError(#[from] LockError)
+	#[error("platform specific error: {0}")]
+	PlatformError(Box<dyn std::error::Error + Send + Sync>)
 }
 
 #[derive(Debug, Error)]
@@ -19,7 +13,7 @@ pub enum UnlockError {
 	#[error("process is not locked")]
 	NotLocked,
 	#[error("platform specific error: {0}")]
-	PlatformError(Box<dyn std::error::Error>)
+	PlatformError(Box<dyn std::error::Error + Send + Sync>)
 }
 
 /// Trait implemented on abstractions over locking and unlocking process memory.
@@ -34,7 +28,7 @@ pub trait MemoryLock {
 	/// Exclusively locks the process.
 	///
 	/// Writing to the process memory without exclusively locking it may cause data races.
-	fn lock_exlusive(&mut self) -> Result<(), ExclusiveLockError>;
+	fn lock_exlusive(&mut self) -> Result<(), LockError>;
 
 	/// Recursively unlock the process.
 	///

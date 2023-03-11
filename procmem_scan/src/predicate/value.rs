@@ -4,25 +4,97 @@ use procmem_access::prelude::OffsetType;
 
 use crate::{
 	candidate::ScannerCandidate,
-	common::AsRawBytes,
 	predicate::{ScannerPredicate, UpdateCandidateResult}
 };
 
 use super::PartialScannerPredicate;
 
+pub trait ByteComparable {
+	fn as_bytes(&self) -> &[u8];
+
+	/// Returns the alignment requirement of the type.
+	///
+	/// This is needed for when the implementor of this trait is a reference.
+	/// Then this function returns the alignment of the type behind reference, not of the reference itself.
+	fn align_of() -> usize;
+}
+macro_rules! impl_byte_comparable {
+	(
+		Pod:
+		$( $pod_type: ty )+
+	) => {
+		$(
+			impl ByteComparable for $pod_type {
+				fn as_bytes(&self) -> &[u8] {
+					unsafe {
+						std::slice::from_raw_parts(
+							self as *const _ as *const u8,
+							std::mem::size_of::<Self>()
+						)
+					}
+				}
+			
+				fn align_of() -> usize {
+					std::mem::align_of::<Self>()
+				}
+			}
+			impl<const N: usize> ByteComparable for [$pod_type; N] {
+				fn as_bytes(&self) -> &[u8] {
+					unsafe {
+						std::slice::from_raw_parts(
+							self.as_slice().as_ptr() as *const u8,
+							std::mem::size_of::<$pod_type>() * N
+						)
+					}
+				}
+			
+				fn align_of() -> usize {
+					<$pod_type as ByteComparable>::align_of()
+				}
+			}
+			impl ByteComparable for &'_ [$pod_type] {
+				fn as_bytes(&self) -> &[u8] {
+					unsafe {
+						std::slice::from_raw_parts(
+							self.as_ptr() as *const u8,
+							std::mem::size_of::<$pod_type>() * self.len()
+						)
+					}
+				}
+			
+				fn align_of() -> usize {
+					<$pod_type as ByteComparable>::align_of()
+				}
+			}
+		)+
+	};
+}
+impl_byte_comparable! {
+	Pod: u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 usize isize f32 f64
+}
+impl ByteComparable for &'_ str {
+    fn as_bytes(&self) -> &[u8] {
+        str::as_bytes(self)
+    }
+
+    fn align_of() -> usize {
+        std::mem::align_of::<u8>()
+    }
+}
+
 /// Predicate scanning for a concrete value in memory.
 ///
-/// The value may be anything but is constrained to `AsRawBytes` because it needs to be accessed as raw bytes safely.
-pub struct ValuePredicate<T: AsRawBytes> {
+/// The value may be anything but is constrained to `ByteComparable` because it needs to be accessed as raw bytes safely.
+pub struct ValuePredicate<T: ByteComparable> {
 	value: T,
 	aligned: bool
 }
-impl<T: AsRawBytes> ValuePredicate<T> {
+impl<T: ByteComparable> ValuePredicate<T> {
 	/// Creates a new predicate.
 	///
-	/// If `aligned` is true then candidates are only generated at offsets that are divisible by [`T::align_of`](AsRawBytes::align_of)
+	/// If `aligned` is true then candidates are only generated at offsets that are divisible by [`T::align_of`](ByteComparable::align_of)
 	pub fn new(value: T, aligned: bool) -> Self {
-		debug_assert!(value.as_raw_bytes().len() > 0);
+		debug_assert!(value.as_bytes().len() > 0);
 
 		ValuePredicate { value, aligned }
 	}
@@ -31,14 +103,14 @@ impl<T: AsRawBytes> ValuePredicate<T> {
 		!self.aligned || (offset.get() % T::align_of() as u64) == 0
 	}
 }
-impl<T: AsRawBytes> ScannerPredicate for ValuePredicate<T> {
+impl<T: ByteComparable> ScannerPredicate for ValuePredicate<T> {
 	fn try_start_candidate(&self, offset: OffsetType, byte: u8) -> Option<ScannerCandidate> {
-		let bytes = self.value.as_raw_bytes();
+		let bytes = self.value.as_bytes();
 		
 		if self.offset_aligned(offset) {
 			if bytes[0] == byte {
 				let result = if bytes.len() == 1 {
-					ScannerCandidate::resolved(offset, None)
+					ScannerCandidate::resolved(offset, NonZeroUsize::new(1).unwrap())
 				} else {
 					ScannerCandidate::normal(offset)
 				};
@@ -56,7 +128,7 @@ impl<T: AsRawBytes> ScannerPredicate for ValuePredicate<T> {
 		byte: u8,
 		candidate: &ScannerCandidate
 	) -> UpdateCandidateResult {
-		let bytes = self.value.as_raw_bytes();
+		let bytes = self.value.as_bytes();
 		debug_assert!(candidate.length().get() < bytes.len());
 
 		if bytes[candidate.length().get()] != byte {
@@ -70,11 +142,11 @@ impl<T: AsRawBytes> ScannerPredicate for ValuePredicate<T> {
 		UpdateCandidateResult::Advance
 	}
 }
-impl<T: AsRawBytes> PartialScannerPredicate for ValuePredicate<T> {
+impl<T: ByteComparable> PartialScannerPredicate for ValuePredicate<T> {
 	fn try_start_partial_candidates(&self, offset: OffsetType, byte: u8) -> Vec<ScannerCandidate> {
 		let mut candidates = Vec::new();
 
-		let bytes = self.value.as_raw_bytes();
+		let bytes = self.value.as_bytes();
 		for (i, target_byte) in bytes
 			.iter()
 			.copied()
@@ -118,12 +190,15 @@ mod test {
 	use procmem_access::prelude::OffsetType;
 
     use super::ValuePredicate;
-	use crate::{candidate::ScannerCandidate, common::AsRawBytes, predicate::{ScannerPredicate, PartialScannerPredicate, UpdateCandidateResult}};
+	use crate::{
+		candidate::ScannerCandidate,
+		predicate::{ScannerPredicate, PartialScannerPredicate, UpdateCandidateResult, value::ByteComparable}
+	};
 
 	#[test]
 	fn test_value_predicate_start() {
 		let data_u16 = [1u16];
-		let data = data_u16.as_raw_bytes();
+		let data = data_u16.as_bytes();
 
 		let predicate = ValuePredicate::new([1], true);
 

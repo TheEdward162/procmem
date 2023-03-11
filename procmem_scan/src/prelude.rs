@@ -1,6 +1,5 @@
 pub use crate::{
 	candidate::ScannerCandidate,
-	common::AsRawBytes,
-	predicate::{value::ValuePredicate, PartialScannerPredicate, ScannerPredicate},
+	predicate::{value::{ValuePredicate, ByteComparable}, PartialScannerPredicate, ScannerPredicate},
 	stream::StreamScanner
 };

@@ -44,12 +44,10 @@ impl ScannerCandidate {
 	}
 
 	/// Creates a new instance of scanner candidate that describes an already resolved candidate.
-	///
-	/// If `length` is None, it is defaulted to one.
-	pub fn resolved(offset: OffsetType, length: Option<NonZeroUsize>) -> Self {
+	pub fn resolved(offset: OffsetType, length: NonZeroUsize) -> Self {
 		ScannerCandidate {
 			offset,
-			length: length.unwrap_or(NonZeroUsize::new(1).unwrap()),
+			length,
 			resolved: true,
 			start_offset: None
 		}
@@ -185,7 +183,7 @@ mod test {
 			}
 		);
 
-		let candidate = ScannerCandidate::resolved(OffsetType::new_unwrap(20), NonZeroUsize::new(12));
+		let candidate = ScannerCandidate::resolved(OffsetType::new_unwrap(20), NonZeroUsize::new(12).unwrap());
 		assert_eq!(
 			candidate,
 			ScannerCandidate {

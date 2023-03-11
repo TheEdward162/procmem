@@ -2,7 +2,6 @@ use thiserror::Error;
 
 use crate::{
 	memory::lock::{
-		ExclusiveLockError,
 		LockError,
 		MemoryLock,
 		UnlockError
@@ -16,8 +15,8 @@ use crate::platform::mach::exception::{MachExceptionHandler, MachExceptionHandle
 pub enum PtraceLockError {
 	#[error("ptrace attach failed")]
 	PtraceAttach(std::io::Error),
-	#[error("kill(SIGSTOP) failed")]
-	SigstopError(std::io::Error),
+	#[error("stopping failed")]
+	StopError(std::io::Error),
 	#[error("ptrace continue failed")]
 	PtraceCont(std::io::Error),
 	#[error("ptrace detach failed")]
@@ -27,6 +26,9 @@ pub enum PtraceLockError {
 	#[error("waitpid failed")]
 	WaitpidError(std::io::Error),
 
+	#[cfg(target_os = "macos")]
+	#[error(transparent)]
+	ExceptionHandlerError(#[from] MachExceptionHandlerError),
 	#[cfg(target_os = "macos")]
 	#[error("failed to initialize mach exception port")]
 	ExceptionPortError(std::io::Error),
@@ -47,22 +49,22 @@ impl From<PtraceLockError> for UnlockError {
 
 pub struct PtraceLock {
 	pid: libc::pid_t,
-	ptrace_attached: bool,
-	ptrace_lock: usize,
+	lock_counter: usize,
 
 	#[cfg(target_os = "macos")]
 	exception_handler: MachExceptionHandler
 }
 #[cfg(target_os = "linux")]
 impl PtraceLock {
-	pub fn new(pid: libc::pid_t) -> Result<Self, std::convert::Infallible> {
-		Ok(
-			PtraceLock {
-				pid,
-				ptrace_attached: false,
-				ptrace_lock: 0
-			}
-		)
+	pub fn new(pid: libc::pid_t) -> Result<Self, PtraceLockError> {
+		let mut me = PtraceLock {
+			pid,
+			lock_counter: 0
+		};
+
+		unsafe { me.ptrace_attach()? };
+		
+		Ok(me)
 	}
 
 	unsafe fn wait_for_stop(&mut self) -> Result<(), PtraceLockError> {
@@ -76,18 +78,56 @@ impl PtraceLock {
 
 		Ok(())
 	}
+
+	unsafe fn ptrace_attach(&mut self) -> Result<(), PtraceLockError> {
+		let ptrace_res = libc::ptrace(libc::PTRACE_SEIZE, self.pid, 0, 0);
+		if ptrace_res != 0 {
+			return Err(PtraceLockError::PtraceAttach(std::io::Error::last_os_error()))
+		}
+
+		Ok(())
+	}
+
+	unsafe fn ptrace_stop(&mut self) -> Result<(), PtraceLockError> {
+		let ptrace_res = libc::ptrace(libc::PTRACE_INTERRUPT, self.pid, 0, 0);
+		if ptrace_res != 0 {
+			return Err(PtraceLockError::StopError(std::io::Error::last_os_error()))
+		}
+		self.wait_for_stop()?;
+
+		Ok(())
+	}
+
+	unsafe fn ptrace_cont(&mut self) -> Result<(), PtraceLockError> {
+		let ptrace_res = libc::ptrace(libc::PTRACE_CONT, self.pid, 0, 0);
+		if ptrace_res != 0 {
+			return Err(PtraceLockError::PtraceCont(std::io::Error::last_os_error()))
+		}
+
+		Ok(())
+	}
+
+	unsafe fn ptrace_detach(&mut self) -> Result<(), PtraceLockError> {
+		let ptrace_res = libc::ptrace(libc::PTRACE_DETACH, self.pid, 0, 0);
+		if ptrace_res != 0 {
+			return Err(PtraceLockError::PtraceDetach(std::io::Error::last_os_error()))
+		}
+
+		Ok(())
+	}
 }
 #[cfg(target_os = "macos")]
 impl PtraceLock {
-	pub fn new(pid: libc::pid_t) -> Result<Self, MachExceptionHandlerError> {
-		Ok(
-			PtraceLock {
-				pid,
-				ptrace_attached: false,
-				ptrace_lock: 0,
-				exception_handler: MachExceptionHandler::new(pid)?
-			}
-		)
+	pub fn new(pid: libc::pid_t) -> Result<Self, PtraceLockError> {
+		let mut me = PtraceLock {
+			pid,
+			lock_counter: 0,
+			exception_handler: MachExceptionHandler::new(pid)?
+		};
+
+		unsafe { me.ptrace_attach()? };
+		
+		Ok(me)
 	}
 
 	unsafe fn wait_for_stop(&mut self) -> Result<(), PtraceLockError> {
@@ -97,43 +137,29 @@ impl PtraceLock {
 		
 		Ok(())
 	}
-}
-impl PtraceLock {
+
 	unsafe fn ptrace_attach(&mut self) -> Result<(), PtraceLockError> {
-		debug_assert!(!self.ptrace_attached);
-
-		#[cfg(target_os = "linux")]
-		let ptrace_res = libc::ptrace(libc::PTRACE_ATTACH, self.pid, 0, 0);
-		#[cfg(target_os = "macos")]
 		let ptrace_res = libc::ptrace(libc::PT_ATTACHEXC, self.pid, std::ptr::null_mut(), 0);
-
 		if ptrace_res != 0 {
 			return Err(PtraceLockError::PtraceAttach(std::io::Error::last_os_error()))
 		}
-
 		self.wait_for_stop()?;
-
-		self.ptrace_attached = true;
+		self.ptrace_cont()?;
 
 		Ok(())
 	}
 
 	unsafe fn ptrace_stop(&mut self) -> Result<(), PtraceLockError> {
 		if libc::kill(self.pid, libc::SIGSTOP) != 0 {
-			return Err(PtraceLockError::SigstopError(std::io::Error::last_os_error()))
+			return Err(PtraceLockError::StopError(std::io::Error::last_os_error()))
 		}
-
 		self.wait_for_stop()?;
 
 		Ok(())
 	}
 
 	unsafe fn ptrace_cont(&mut self) -> Result<(), PtraceLockError> {
-		#[cfg(target_os = "linux")]
-		let ptrace_res = libc::ptrace(libc::PTRACE_CONT, self.pid, 0, 0);
-		#[cfg(target_os = "macos")]
-		let ptrace_res = libc::ptrace(libc::PT_CONTINUE, self.pid, 1 as *mut i8, 0);
-
+		let ptrace_res = libc::ptrace(libc::PT_CONTINUE, self.pid, 1 as _, 0);
 		if ptrace_res != 0 {
 			return Err(PtraceLockError::PtraceCont(std::io::Error::last_os_error()))
 		}
@@ -142,83 +168,66 @@ impl PtraceLock {
 	}
 
 	unsafe fn ptrace_detach(&mut self) -> Result<(), PtraceLockError> {
-		debug_assert!(self.ptrace_attached);
-
-		#[cfg(target_os = "linux")]
-		let ptrace_res = libc::ptrace(libc::PTRACE_DETACH, self.pid, 0, 0);
-		#[cfg(target_os = "macos")]
 		let ptrace_res = libc::ptrace(libc::PT_DETACH, self.pid, std::ptr::null_mut(), 0);
-
 		if ptrace_res != 0 {
 			return Err(PtraceLockError::PtraceDetach(std::io::Error::last_os_error()))
 		}
-		self.ptrace_attached = false;
 
 		Ok(())
 	}
 }
 impl MemoryLock for PtraceLock {
 	fn lock(&mut self) -> Result<bool, LockError> {
-		let result = if !self.ptrace_attached {
-			unsafe {
-				self.ptrace_attach()?;
-			}
+		if self.lock_counter == 0 {
+			unsafe { self.ptrace_stop()?; }
+			self.lock_counter = 1;
 
-			true
-		} else if self.ptrace_lock == 0 {
-			unsafe {
-				self.ptrace_stop()?;
-			}
-
-			true
+			Ok(true)
+		} else if self.lock_counter == usize::MAX {
+			Err(LockError::AlreadyLocked)
 		} else {
-			false
-		};
+			self.lock_counter += 1;
 
-		self.ptrace_lock += 1;
-		Ok(result)
+			Ok(false)
+		}
 	}
 
-	fn lock_exlusive(&mut self) -> Result<(), ExclusiveLockError> {
-		if self.ptrace_lock == 0 {
+	fn lock_exlusive(&mut self) -> Result<(), LockError> {
+		if self.lock_counter == 0 {
 			self.lock()?;
-		} else {
-			return Err(ExclusiveLockError::AlreadyLocked)
-		}
+			self.lock_counter = usize::MAX;
 
-		Ok(())
+			Ok(())
+		} else {
+			Err(LockError::AlreadyLocked)
+		}
 	}
 
 	fn unlock(&mut self) -> Result<bool, UnlockError> {
-		if self.ptrace_lock == 0 {
+		if self.lock_counter == 0 {
 			return Err(UnlockError::NotLocked)
 		}
 
-		self.ptrace_lock -= 1;
-		if self.ptrace_lock == 0 {
+		if self.lock_counter == 1 || self.lock_counter == usize::MAX {
 			unsafe {
 				self.ptrace_cont()?;
 			}
+			self.lock_counter = 0;
 
 			Ok(true)
 		} else {
+			self.lock_counter -= 1;
+
 			Ok(false)
 		}
 	}
 }
 impl Drop for PtraceLock {
 	fn drop(&mut self) {
-		if self.ptrace_attached {
-			if self.ptrace_lock == 0 {
-				// need to stop the process to detach from it, weirdly
-				unsafe {
-					self.ptrace_stop().unwrap();
-				}
-			}
+		let _ = self.lock();
 
-			unsafe {
-				self.ptrace_detach().unwrap();
-			}
+		unsafe {
+			self.ptrace_detach().unwrap()
 		}
 	}
 }

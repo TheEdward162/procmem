@@ -4,6 +4,7 @@ use procmem_access::{prelude::OffsetType, util::AccFilter};
 
 use crate::{candidate::ScannerCandidate, predicate::{PartialScannerPredicate, ScannerPredicate, UpdateCandidateResult}};
 
+/// Scan result consists of memory offset and length of the match.
 pub type ScanResult = (OffsetType, NonZeroUsize);
 
 /// Scans a stream of bytes for values matching the predicate.
@@ -283,11 +284,11 @@ mod test {
 	use procmem_access::prelude::OffsetType;
 
     use super::StreamScanner;
-	use crate::{common::AsRawBytes, predicate::value::ValuePredicate};
+	use crate::predicate::value::{ValuePredicate, ByteComparable};
 
 	#[test]
 	fn test_stream_scanner() {
-		let data = b"Hello There";
+		let data: &[u8] = dbg!(b"Hello There");
 
 		let predicate = ValuePredicate::new(data, true);
 		let mut scanner = StreamScanner::new(predicate);
@@ -319,7 +320,7 @@ mod test {
 		let mut scanner = StreamScanner::new(predicate);
 		let found: Vec<_> = scanner.scan_once(
 			OffsetType::new_unwrap(8),
-			data.as_raw_bytes().iter().copied()
+			data.as_bytes().iter().copied()
 		).collect();
 
 		assert_eq!(
@@ -345,13 +346,13 @@ mod test {
 		found.extend(
 			scanner.scan_partial(
 				OffsetType::new_unwrap(8),
-				data.as_raw_bytes().iter().copied()
+				data.as_bytes().iter().copied()
 			)
 		);
 		found.extend(
 			scanner.scan_partial(
 				OffsetType::new_unwrap(112),
-				second_data.as_raw_bytes().iter().copied()
+				second_data.as_bytes().iter().copied()
 			)
 		);
 

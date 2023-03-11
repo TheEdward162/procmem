@@ -24,7 +24,7 @@ pub struct ProcfsMemoryMap {
 	pages: Vec<MemoryPage>
 }
 impl ProcfsMemoryMap {
-	pub fn map_path(pid: libc::pid_t) -> std::path::PathBuf {
+	fn map_path(pid: libc::pid_t) -> std::path::PathBuf {
 		format!("/proc/{}/maps", pid).into()
 	}
 

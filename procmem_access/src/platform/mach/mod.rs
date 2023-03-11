@@ -58,3 +58,62 @@ impl Drop for TaskPort {
 		debug_assert_eq!(result, 0);
 	}
 }
+
+// <https://opensource.apple.com/source/xnu/xnu-2422.1.72/libsyscall/wrappers/libproc/libproc.h.auto.html>
+pub struct ProcessInfo {
+	pub pid: libc::pid_t,
+	pub name: String
+}
+impl ProcessInfo {
+	pub fn list_all() -> std::io::Result<Vec<Self>> {
+		let pids = {
+			// get initial count
+			let count = unsafe { libc::proc_listallpids(std::ptr::null_mut(), 0) };
+			if count < 0 {
+				return Err(std::io::Error::last_os_error());
+			}
+			if count == 0 {
+				return Ok(Vec::new());
+			}
+			
+			// prepare destination buffer and read the actual pids
+			let mut pids: Vec<libc::pid_t> = Vec::new();
+			pids.resize(count as usize, 0);
+			let count = unsafe {
+				libc::proc_listallpids(
+					pids.as_mut_ptr() as _,
+					(pids.len() * std::mem::size_of::<libc::pid_t>()) as _
+				)
+			};
+			if count < 0 {
+				return Err(std::io::Error::last_os_error());
+			}
+			// in case the number of processes increased between the two reads, we return the smaller number
+			let count = pids.len().min(count as usize);
+			unsafe { pids.set_len(count); }
+	
+			pids
+		};
+	
+		let mut processes = Vec::with_capacity(pids.len());
+		for pid in pids {
+			processes.push(Self::for_pid(pid)?);
+		}
+	
+		Ok(processes)
+	}
+
+	pub fn for_pid(pid: libc::pid_t) -> std::io::Result<Self> {
+		let name = Self::process_name(pid)?;
+		Ok(Self { pid, name })
+	}
+
+	fn process_name(pid: libc::pid_t) -> std::io::Result<String> {	
+		let mut buffer = [0u8; 32];
+	
+		let count = unsafe { libc::proc_name(pid, buffer.as_mut_ptr() as _, buffer.len() as _) };
+		if count < 0 { return Err(std::io::Error::last_os_error()); }
+	
+		Ok(String::from_utf8_lossy(&buffer[..count as usize]).into_owned())
+	}
+}
