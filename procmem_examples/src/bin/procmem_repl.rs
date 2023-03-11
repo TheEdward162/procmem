@@ -1,8 +1,7 @@
 use anyhow::Context;
 use rustyline::{
+	completion::Pair as CompletionPair, config::Config, error::ReadlineError, history::MemHistory,
 	Editor,
-	error::ReadlineError,
-	config::Config, history::MemHistory, completion::Pair as CompletionPair
 };
 
 struct ReplHelper {}
@@ -49,36 +48,33 @@ impl ReplHelper {
 			"info pages",
 			"exit"
 		}
-		
+
 		results
 	}
 }
-impl rustyline::validate::Validator for ReplHelper {
-}
+impl rustyline::validate::Validator for ReplHelper {}
 impl rustyline::highlight::Highlighter for ReplHelper {}
 impl rustyline::hint::Hinter for ReplHelper {
-    type Hint = String;
+	type Hint = String;
 
-    fn hint(&self, line: &str, pos: usize, _ctx: &rustyline::Context<'_>) -> Option<Self::Hint> {
-        if line.len() == 0 {
+	fn hint(&self, line: &str, pos: usize, _ctx: &rustyline::Context<'_>) -> Option<Self::Hint> {
+		if line.len() == 0 {
 			return None;
 		}
-		
+
 		let completions = Self::try_complete(line);
 
 		match completions.get(0) {
 			None => None,
-			Some(completion) => {
-				Some(completion.replacement[pos..].to_string())
-			}
+			Some(completion) => Some(completion.replacement[pos..].to_string()),
 		}
-    }	
+	}
 }
 impl rustyline::completion::Completer for ReplHelper {
-    type Candidate = CompletionPair;
+	type Candidate = CompletionPair;
 
 	fn complete(
-		&self, 
+		&self,
 		line: &str,
 		_pos: usize,
 		_ctx: &rustyline::Context<'_>,
@@ -87,8 +83,10 @@ impl rustyline::completion::Completer for ReplHelper {
 			const MAX_SHOWN: usize = 16;
 
 			let pid_prefix = line.split_whitespace().nth(1);
-			let pids = app::ProcessInfo::list_all().unwrap().into_iter().filter_map(
-				|p| {
+			let pids = app::ProcessInfo::list_all()
+				.unwrap()
+				.into_iter()
+				.filter_map(|p| {
 					let pid_str = format!("{}", p.pid);
 					let display = if p.name.len() > MAX_SHOWN {
 						format!("{} ({}~)", pid_str, &p.name[..(MAX_SHOWN - 1)])
@@ -100,15 +98,15 @@ impl rustyline::completion::Completer for ReplHelper {
 						Some(false) => None,
 						Some(true) | None => Some(CompletionPair {
 							display,
-							replacement: pid_str
-						})
+							replacement: pid_str,
+						}),
 					}
-				}
-			).collect();
+				})
+				.collect();
 
 			return Ok((7, pids));
 		}
-		
+
 		Ok((0, Self::try_complete(line)))
 	}
 }
@@ -124,7 +122,7 @@ fn main() -> anyhow::Result<()> {
 			.bell_style(rustyline::config::BellStyle::None)
 			.tab_stop(4)
 			.build(),
-		MemHistory::default()
+		MemHistory::default(),
 	)?;
 	rl.set_helper(Some(ReplHelper::new()));
 
@@ -151,12 +149,14 @@ fn main() -> anyhow::Result<()> {
 				Some(_) => println!("Already attached, use `detach` first"),
 				None => match line.split_whitespace().nth(1).unwrap_or("").parse() {
 					Err(_) => println!("Invalid PID"),
-					Ok(pid) => { app = Some(App::attach(pid)?); }
-				}
+					Ok(pid) => {
+						app = Some(App::attach(pid)?);
+					}
+				},
 			},
 			Ok(line) if line == "detach" => match app.take() {
 				None => println!("Not attached, cannot detach"),
-				Some(_) => ()
+				Some(_) => (),
 			},
 			Ok(line) if line == "stop" => on_attached! { app => app.lock(); },
 			Ok(line) if line == "continue" => on_attached! { app => app.unlock(); },
@@ -179,7 +179,7 @@ fn main() -> anyhow::Result<()> {
 			// scans
 			Ok(line) if line.starts_with("scan ") => on_attached! { app =>
 				let mut arguments = line.split_whitespace().skip(1);
-				
+
 				let value_type = arguments.next().context("scan type is required")?;
 				let value_str = arguments.next().context("scan value is required")?;
 
@@ -270,7 +270,7 @@ fn main() -> anyhow::Result<()> {
 				}
 			},
 			// rest
-			Ok(line) => println!("Unknown command \"{}\"", line)
+			Ok(line) => println!("Unknown command \"{}\"", line),
 		}
 	}
 
@@ -282,23 +282,18 @@ mod app {
 
 	use anyhow::Context;
 
-	use procmem_access::prelude::{
-		MemoryAccess, MemoryLock,
-		MemoryMap, MemoryPage, OffsetType
-	};
-	use procmem_access::platform::simple::{
-		SimpleMemoryMap, SimpleMemoryLock, SimpleMemoryAccess
-	};
 	pub use procmem_access::platform::simple::ProcessInfo;
-	use procmem_scan::prelude::{
-		ValuePredicate, StreamScanner, ByteComparable
+	use procmem_access::{
+		platform::simple::{SimpleMemoryAccess, SimpleMemoryLock, SimpleMemoryMap},
+		prelude::{MemoryAccess, MemoryLock, MemoryMap, MemoryPage, OffsetType},
 	};
+	use procmem_scan::prelude::{ByteComparable, StreamScanner, ValuePredicate};
 
 	pub enum ScanResult {
 		Many(usize),
 		Few(Vec<OffsetType>),
 		One(OffsetType),
-		Zero
+		Zero,
 	}
 
 	pub struct App {
@@ -309,12 +304,15 @@ mod app {
 		access: SimpleMemoryAccess,
 		pages: Vec<MemoryPage>,
 		current_matches: BTreeSet<OffsetType>,
-		user_locked: bool
+		user_locked: bool,
 	}
 	impl App {
 		fn filter_page_predicate(page: &MemoryPage) -> bool {
-			page.permissions.read() && page.permissions.write() && !page.permissions.shared() && page.offset == 0
-			
+			page.permissions.read()
+				&& page.permissions.write()
+				&& !page.permissions.shared()
+				&& page.offset == 0
+
 			// && matches!(page.page_type, MemoryPageType::Stack | MemoryPageType::Heap)
 		}
 
@@ -326,13 +324,15 @@ mod app {
 			let access = SimpleMemoryAccess::new(pid)?;
 
 			let pages: Vec<MemoryPage> = MemoryPage::merge_sorted(
-				map.pages().into_iter().filter(
-					|page| Self::filter_page_predicate(page)
-				).cloned()
-			).collect();
+				map.pages()
+					.into_iter()
+					.filter(|page| Self::filter_page_predicate(page))
+					.cloned(),
+			)
+			.collect();
 
 			lock.unlock()?;
-			
+
 			Ok(Self {
 				pid,
 				lock,
@@ -340,7 +340,7 @@ mod app {
 				access,
 				pages,
 				current_matches: Default::default(),
-				user_locked: false
+				user_locked: false,
 			})
 		}
 
@@ -349,9 +349,10 @@ mod app {
 		}
 
 		pub fn pages(&self) -> impl Iterator<Item = (bool, &'_ MemoryPage)> {
-			self.map.pages().into_iter().map(
-				|p| (Self::filter_page_predicate(p), p)
-			)
+			self.map
+				.pages()
+				.into_iter()
+				.map(|p| (Self::filter_page_predicate(p), p))
 		}
 
 		pub fn is_locked(&self) -> bool {
@@ -380,19 +381,25 @@ mod app {
 			self.current_matches.clear()
 		}
 
-		pub fn scan_exact<T: ByteComparable>(&mut self, value: T, aligned: bool) -> anyhow::Result<ScanResult> {
+		pub fn scan_exact<T: ByteComparable>(
+			&mut self,
+			value: T,
+			aligned: bool,
+		) -> anyhow::Result<ScanResult> {
 			self.lock.lock()?;
-			
+
 			let predicate = ValuePredicate::new(value, aligned);
 			let mut scanner = StreamScanner::new(predicate);
-			
+
 			let mut new_matches = BTreeSet::default();
 			let mut chunk_buffer = Vec::new();
 			for page in self.pages.iter() {
 				chunk_buffer.resize(page.size(), 0);
 
 				unsafe {
-					self.access.read(page.start(), chunk_buffer.as_mut()).context("Could not read memory page")?;
+					self.access
+						.read(page.start(), chunk_buffer.as_mut())
+						.context("Could not read memory page")?;
 				}
 
 				for (offset, _) in scanner.scan_once(page.start(), chunk_buffer.iter().copied()) {
@@ -402,12 +409,12 @@ mod app {
 				}
 			}
 			self.current_matches = new_matches;
-			
+
 			let result = match self.current_matches.len() {
 				0 => ScanResult::Zero,
 				1 => ScanResult::One(self.current_matches.iter().next().unwrap().clone()),
-				2 ..= 5 => ScanResult::Few(self.current_matches.iter().cloned().collect()),
-				n => ScanResult::Many(n)
+				2..=5 => ScanResult::Few(self.current_matches.iter().cloned().collect()),
+				n => ScanResult::Many(n),
 			};
 
 			self.lock.unlock()?;
@@ -415,13 +422,19 @@ mod app {
 			Ok(result)
 		}
 
-		pub unsafe fn write<T: ByteComparable>(&mut self, offset: u64, value: T) -> anyhow::Result<()> {
+		pub unsafe fn write<T: ByteComparable>(
+			&mut self,
+			offset: u64,
+			value: T,
+		) -> anyhow::Result<()> {
 			self.lock.lock()?;
 
 			let offset = OffsetType::new_unwrap(offset);
 
 			unsafe {
-				self.access.write(offset, value.as_bytes()).context("Could not write memory")?
+				self.access
+					.write(offset, value.as_bytes())
+					.context("Could not write memory")?
 			};
 
 			self.lock.unlock()?;

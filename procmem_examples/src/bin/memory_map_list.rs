@@ -1,20 +1,14 @@
-use procmem_access::prelude::{
-	MemoryMap
-};
-use procmem_access::platform::simple::{
-	SimpleMemoryMap
-};
+use procmem_access::{platform::simple::SimpleMemoryMap, prelude::MemoryMap};
 
 fn main() {
 	// simple cli parse
 	let pid = {
 		let mut it = std::env::args().skip(1);
 
-		let pid: i32 = it.next().and_then(
-			|s| s.parse().ok()
-		).unwrap_or_else(
-			|| std::process::id() as i32
-		);
+		let pid: i32 = it
+			.next()
+			.and_then(|s| s.parse().ok())
+			.unwrap_or_else(|| std::process::id() as i32);
 
 		pid
 	};

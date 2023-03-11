@@ -3,6 +3,6 @@ pub use crate::{
 	memory::{
 		access::MemoryAccess,
 		lock::MemoryLock,
-		map::{MemoryMap, MemoryPage, MemoryPagePermissions, MemoryPageType}
-	}
+		map::{MemoryMap, MemoryPage, MemoryPagePermissions, MemoryPageType},
+	},
 };

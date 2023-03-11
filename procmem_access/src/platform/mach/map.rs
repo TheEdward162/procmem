@@ -3,21 +3,21 @@ use thiserror::Error;
 use mach::{
 	kern_return::KERN_SUCCESS,
 	mach_port::mach_port_deallocate,
-	port::{MACH_PORT_NULL, mach_port_t},
+	port::{mach_port_t, MACH_PORT_NULL},
 	vm_prot::{VM_PROT_EXECUTE, VM_PROT_READ, VM_PROT_WRITE},
-	vm_region::{VM_REGION_BASIC_INFO_64, vm_region_basic_info_64, vm_region_info_t},
-	vm_types::{mach_vm_address_t, mach_vm_size_t}
+	vm_region::{vm_region_basic_info_64, vm_region_info_t, VM_REGION_BASIC_INFO_64},
+	vm_types::{mach_vm_address_t, mach_vm_size_t},
 };
 
 use crate::{
 	common::OffsetType,
-	memory::map::{MemoryMap, MemoryPage, MemoryPagePermissions, MemoryPageType}
+	memory::map::{MemoryMap, MemoryPage, MemoryPagePermissions, MemoryPageType},
 };
 
 #[derive(Debug, Error)]
 pub enum MachMemoryMapError {
 	#[error("could not retrieve port handle")]
-	PortError(std::io::Error)
+	PortError(std::io::Error),
 }
 
 pub struct MachMemoryMap {
@@ -34,11 +34,7 @@ impl MachMemoryMap {
 			pages.push(page);
 		}
 
-		Ok(
-			MachMemoryMap {
-				pages
-			}
-		)
+		Ok(MachMemoryMap { pages })
 	}
 
 	fn enumerate_next_page(
@@ -61,7 +57,7 @@ impl MachMemoryMap {
 				VM_REGION_BASIC_INFO_64,
 				&mut info as *mut vm_region_basic_info_64 as vm_region_info_t,
 				&mut info_count,
-				&mut object_name
+				&mut object_name,
 			)
 		};
 
@@ -80,19 +76,19 @@ impl MachMemoryMap {
 		let page = MemoryPage {
 			address_range: [
 				OffsetType::new(address).unwrap(),
-				OffsetType::new(address + size).unwrap()
+				OffsetType::new(address + size).unwrap(),
 			],
 			permissions: MemoryPagePermissions::new(
 				info.protection & VM_PROT_READ != 0,
 				info.protection & VM_PROT_WRITE != 0,
 				info.protection & VM_PROT_EXECUTE != 0,
-				info.shared != 0
+				info.shared != 0,
 			),
 			offset: info.offset,
 			// TODO: This info can probably be retrieved from somewhere, maybe `object_name`?
-			page_type: MemoryPageType::Unknown
+			page_type: MemoryPageType::Unknown,
 		};
-		
+
 		Some(page)
 	}
 }

@@ -28,7 +28,7 @@
 pub struct AccFilter<T, I: Iterator<Item = T>, F: FnMut(&mut Option<T>, T) -> Option<T>> {
 	iter: I,
 	fun: F,
-	state: Option<T>
+	state: Option<T>,
 }
 impl<T, I: Iterator<Item = T>, F: FnMut(&mut Option<T>, T) -> Option<T>> AccFilter<T, I, F> {
 	pub fn new(iter: I, fun: F) -> Self {
@@ -41,10 +41,7 @@ impl<T, I: Iterator<Item = T>, F: FnMut(&mut Option<T>, T) -> Option<T>> AccFilt
 }
 impl<T, F: FnMut(&mut Option<T>, T) -> Option<T>> AccFilter<T, std::iter::Empty<T>, F> {
 	/// Performs accumulation filter on a vector in-place.
-	pub fn acc_filter_vec_mut(
-		vec: &mut Vec<T>,
-		mut fun: F
-	) {
+	pub fn acc_filter_vec_mut(vec: &mut Vec<T>, mut fun: F) {
 		// reserve one more because we might produce one more values than there are originally
 		vec.reserve(1);
 		let vec_ptr = vec.as_mut_ptr();
@@ -56,18 +53,14 @@ impl<T, F: FnMut(&mut Option<T>, T) -> Option<T>> AccFilter<T, std::iter::Empty<
 		unsafe {
 			vec.set_len(0);
 		}
-		
+
 		let mut acc = None;
 		let mut write_index = 0;
-		for read_index in 0 .. vec_len {
+		for read_index in 0..vec_len {
 			// move a value out of the vector
-			// safe because the vec already fulfills the requirements 
+			// safe because the vec already fulfills the requirements
 			// and because we `set_len(0)` panics don't cause a double-drop
-			let value = unsafe {
-				std::ptr::read(
-					vec_ptr.add(read_index)
-				)
-			};
+			let value = unsafe { std::ptr::read(vec_ptr.add(read_index)) };
 
 			match fun(&mut acc, value) {
 				None => (),
@@ -76,10 +69,7 @@ impl<T, F: FnMut(&mut Option<T>, T) -> Option<T>> AccFilter<T, std::iter::Empty<
 					// safe because the closure can never produce more elements than it receives
 					// (plus the one in acc handled later)
 					unsafe {
-						std::ptr::write(
-							vec_ptr.add(write_index),
-							value
-						);
+						std::ptr::write(vec_ptr.add(write_index), value);
 					}
 					write_index += 1;
 				}
@@ -112,8 +102,8 @@ impl<T, I: Iterator<Item = T>, F: FnMut(&mut Option<T>, T) -> Option<T>> Iterato
 				None => break self.state.take(),
 				Some(item) => match (self.fun)(&mut self.state, item) {
 					None => continue,
-					Some(result) => break Some(result)
-				}
+					Some(result) => break Some(result),
+				},
 			}
 		}
 	}
@@ -121,7 +111,7 @@ impl<T, I: Iterator<Item = T>, F: FnMut(&mut Option<T>, T) -> Option<T>> Iterato
 	fn size_hint(&self) -> (usize, Option<usize>) {
 		let upper = match self.iter.size_hint().1 {
 			None => None,
-			Some(u) => u.checked_add(1)
+			Some(u) => u.checked_add(1),
 		};
 
 		(0, upper)
@@ -139,8 +129,8 @@ mod test {
 				[1, 1, 1, 2, 3, 3, 4, 4, 4].iter().copied(),
 				|acc, curr| match acc {
 					Some(acc) if *acc == curr => None,
-					_ => acc.replace(curr)
-				}
+					_ => acc.replace(curr),
+				},
 			);
 
 		let deduped = dedup.collect::<Vec<_>>();
@@ -153,7 +143,7 @@ mod test {
 
 		AccFilter::acc_filter_vec_mut(&mut vec, |acc, curr| match acc {
 			Some(acc) if *acc == curr => None,
-			_ => acc.replace(curr)
+			_ => acc.replace(curr),
 		});
 
 		assert_eq!(vec, &[1, 2, 3, 4]);

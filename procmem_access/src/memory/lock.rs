@@ -5,7 +5,7 @@ pub enum LockError {
 	#[error("process is already locked exclusively")]
 	AlreadyLocked,
 	#[error("platform specific error: {0}")]
-	PlatformError(Box<dyn std::error::Error + Send + Sync>)
+	PlatformError(Box<dyn std::error::Error + Send + Sync>),
 }
 
 #[derive(Debug, Error)]
@@ -13,7 +13,7 @@ pub enum UnlockError {
 	#[error("process is not locked")]
 	NotLocked,
 	#[error("platform specific error: {0}")]
-	PlatformError(Box<dyn std::error::Error + Send + Sync>)
+	PlatformError(Box<dyn std::error::Error + Send + Sync>),
 }
 
 /// Trait implemented on abstractions over locking and unlocking process memory.

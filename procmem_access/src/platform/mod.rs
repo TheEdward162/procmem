@@ -1,7 +1,4 @@
-#[cfg(any(
-	target_os = "linux",
-	target_os = "macos"
-))]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 pub mod ptrace;
 
 #[cfg(target_os = "linux")]

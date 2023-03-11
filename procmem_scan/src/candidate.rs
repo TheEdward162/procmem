@@ -1,6 +1,6 @@
 use std::{
 	cmp::{Ord, Ordering, PartialOrd},
-	num::NonZeroUsize
+	num::NonZeroUsize,
 };
 
 use procmem_access::{prelude::OffsetType, util::AccFilter};
@@ -17,7 +17,7 @@ pub struct ScannerCandidate {
 	/// Offset at which this (partial) candidate starts, if different from `offset`.
 	///
 	/// This value is always greated than `start_offset`.
-	start_offset: Option<OffsetType>
+	start_offset: Option<OffsetType>,
 }
 impl ScannerCandidate {
 	pub fn normal(offset: OffsetType) -> Self {
@@ -25,7 +25,7 @@ impl ScannerCandidate {
 			offset,
 			length: NonZeroUsize::new(1).unwrap(),
 			resolved: false,
-			start_offset: None
+			start_offset: None,
 		}
 	}
 
@@ -37,9 +37,9 @@ impl ScannerCandidate {
 			offset,
 			length,
 			resolved: false,
-			start_offset: Some(
-				OffsetType::new_unwrap(offset.get() + length.get() as u64 - 1)
-			)
+			start_offset: Some(OffsetType::new_unwrap(
+				offset.get() + length.get() as u64 - 1,
+			)),
 		}
 	}
 
@@ -49,7 +49,7 @@ impl ScannerCandidate {
 			offset,
 			length,
 			resolved: true,
-			start_offset: None
+			start_offset: None,
 		}
 	}
 
@@ -59,7 +59,7 @@ impl ScannerCandidate {
 	pub fn partial_resolved(offset: OffsetType, length: NonZeroUsize) -> Self {
 		Self {
 			resolved: true,
-			.. Self::partial(offset, length)
+			..Self::partial(offset, length)
 		}
 	}
 
@@ -122,12 +122,12 @@ impl ScannerCandidate {
 	pub fn try_merge_mut(&mut self, other: Self) -> Result<(), Self> {
 		// Cannot be the same match if they don't start in the same place
 		if self.offset() != other.offset() {
-			return Err(other)
+			return Err(other);
 		}
 
 		// Cannot merge if they don't intersect.
 		if self.end_offset() < other.start_offset() || other.end_offset() < self.start_offset() {
-			return Err(other)
+			return Err(other);
 		}
 
 		self.length = self.length.max(other.length);
@@ -143,8 +143,8 @@ impl ScannerCandidate {
 			None => acc.replace(curr),
 			Some(a) => match a.try_merge_mut(curr) {
 				Ok(()) => None,
-				Err(other) => acc.replace(other)
-			}
+				Err(other) => acc.replace(other),
+			},
 		})
 	}
 }
@@ -168,7 +168,7 @@ mod test {
 
 	use procmem_access::prelude::OffsetType;
 
-    use super::ScannerCandidate;
+	use super::ScannerCandidate;
 
 	#[test]
 	fn test_scanner_candidate_construction() {
@@ -183,7 +183,8 @@ mod test {
 			}
 		);
 
-		let candidate = ScannerCandidate::resolved(OffsetType::new_unwrap(20), NonZeroUsize::new(12).unwrap());
+		let candidate =
+			ScannerCandidate::resolved(OffsetType::new_unwrap(20), NonZeroUsize::new(12).unwrap());
 		assert_eq!(
 			candidate,
 			ScannerCandidate {
@@ -194,7 +195,8 @@ mod test {
 			}
 		);
 
-		let candidate = ScannerCandidate::partial(OffsetType::new_unwrap(11), NonZeroUsize::new(5).unwrap());
+		let candidate =
+			ScannerCandidate::partial(OffsetType::new_unwrap(11), NonZeroUsize::new(5).unwrap());
 		assert_eq!(
 			candidate,
 			ScannerCandidate {
@@ -205,7 +207,10 @@ mod test {
 			}
 		);
 
-		let candidate = ScannerCandidate::partial_resolved(OffsetType::new_unwrap(10), NonZeroUsize::new(2).unwrap());
+		let candidate = ScannerCandidate::partial_resolved(
+			OffsetType::new_unwrap(10),
+			NonZeroUsize::new(2).unwrap(),
+		);
 		assert_eq!(
 			candidate,
 			ScannerCandidate {
@@ -224,26 +229,26 @@ mod test {
 				offset: OffsetType::new_unwrap(2),
 				length: NonZeroUsize::new(2).unwrap(),
 				resolved: false,
-				start_offset: None
+				start_offset: None,
 			},
 			ScannerCandidate {
 				offset: OffsetType::new_unwrap(2),
 				length: NonZeroUsize::new(1).unwrap(),
 				resolved: false,
-				start_offset: None
+				start_offset: None,
 			},
 			ScannerCandidate {
 				offset: OffsetType::new_unwrap(1),
 				length: NonZeroUsize::new(3).unwrap(),
 				resolved: false,
-				start_offset: Some(OffsetType::new_unwrap(1))
+				start_offset: Some(OffsetType::new_unwrap(1)),
 			},
 			ScannerCandidate {
 				offset: OffsetType::new_unwrap(1),
 				length: NonZeroUsize::new(2).unwrap(),
 				resolved: false,
-				start_offset: None
-			}
+				start_offset: None,
+			},
 		];
 
 		candidates.sort();
@@ -286,26 +291,26 @@ mod test {
 				offset: OffsetType::new_unwrap(1),
 				length: NonZeroUsize::new(2).unwrap(),
 				resolved: false,
-				start_offset: None
+				start_offset: None,
 			},
 			ScannerCandidate {
 				offset: OffsetType::new_unwrap(1),
 				length: NonZeroUsize::new(3).unwrap(),
 				resolved: false,
-				start_offset: Some(OffsetType::new_unwrap(1))
+				start_offset: Some(OffsetType::new_unwrap(1)),
 			},
 			ScannerCandidate {
 				offset: OffsetType::new_unwrap(2),
 				length: NonZeroUsize::new(1).unwrap(),
 				resolved: false,
-				start_offset: None
+				start_offset: None,
 			},
 			ScannerCandidate {
 				offset: OffsetType::new_unwrap(2),
 				length: NonZeroUsize::new(2).unwrap(),
 				resolved: true,
-				start_offset: None
-			}
+				start_offset: None,
+			},
 		];
 
 		let result = ScannerCandidate::merge_sorted(values.iter().copied()).collect::<Vec<_>>();
@@ -339,13 +344,13 @@ mod test {
 			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(3).unwrap(),
 			resolved: false,
-			start_offset: None
+			start_offset: None,
 		};
 		let right = ScannerCandidate {
 			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(4).unwrap(),
 			resolved: false,
-			start_offset: Some(OffsetType::new_unwrap(10))
+			start_offset: Some(OffsetType::new_unwrap(10)),
 		};
 
 		left.try_merge_mut(right).unwrap();
@@ -371,13 +376,13 @@ mod test {
 			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(3).unwrap(),
 			resolved: false,
-			start_offset: Some(OffsetType::new_unwrap(9))
+			start_offset: Some(OffsetType::new_unwrap(9)),
 		};
 		let right = ScannerCandidate {
 			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(4).unwrap(),
 			resolved: true,
-			start_offset: Some(OffsetType::new_unwrap(11))
+			start_offset: Some(OffsetType::new_unwrap(11)),
 		};
 
 		left.try_merge_mut(right).unwrap();
@@ -403,13 +408,13 @@ mod test {
 			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(2).unwrap(),
 			resolved: false,
-			start_offset: Some(OffsetType::new_unwrap(9))
+			start_offset: Some(OffsetType::new_unwrap(9)),
 		};
 		let right = ScannerCandidate {
 			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(4).unwrap(),
 			resolved: true,
-			start_offset: Some(OffsetType::new_unwrap(10))
+			start_offset: Some(OffsetType::new_unwrap(10)),
 		};
 
 		left.try_merge_mut(right).unwrap();
@@ -431,13 +436,13 @@ mod test {
 			offset: OffsetType::new_unwrap(9),
 			length: NonZeroUsize::new(2).unwrap(),
 			resolved: false,
-			start_offset: Some(OffsetType::new_unwrap(10))
+			start_offset: Some(OffsetType::new_unwrap(10)),
 		};
 		let right = ScannerCandidate {
 			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(4).unwrap(),
 			resolved: true,
-			start_offset: Some(OffsetType::new_unwrap(12))
+			start_offset: Some(OffsetType::new_unwrap(12)),
 		};
 		left.try_merge_mut(right).unwrap_err();
 		assert_eq!(left.length.get(), 2);
@@ -446,13 +451,13 @@ mod test {
 			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(2).unwrap(),
 			resolved: false,
-			start_offset: None
+			start_offset: None,
 		};
 		let right = ScannerCandidate {
 			offset: OffsetType::new_unwrap(8),
 			length: NonZeroUsize::new(4).unwrap(),
 			resolved: true,
-			start_offset: Some(OffsetType::new_unwrap(12))
+			start_offset: Some(OffsetType::new_unwrap(12)),
 		};
 		left.try_merge_mut(right).unwrap_err();
 		assert_eq!(left.length.get(), 2);

@@ -1,13 +1,13 @@
 use std::{
 	fs::{self, OpenOptions},
-	io::Read
+	io::Read,
 };
 
 use thiserror::Error;
 
 use crate::{
 	common::OffsetType,
-	memory::map::{MemoryMap, MemoryPage, MemoryPagePermissions, MemoryPageType}
+	memory::map::{MemoryMap, MemoryPage, MemoryPagePermissions, MemoryPageType},
 };
 
 #[derive(Debug, Error)]
@@ -15,13 +15,13 @@ pub enum ProcfsMemoryMapLoadError {
 	#[error("could not read map file")]
 	Io(#[from] std::io::Error),
 	#[error(transparent)]
-	MemoryPageParseError(#[from] MemoryPageParseError)
+	MemoryPageParseError(#[from] MemoryPageParseError),
 }
 
 pub struct ProcfsMemoryMap {
 	#[allow(dead_code)]
 	pid: libc::pid_t,
-	pages: Vec<MemoryPage>
+	pages: Vec<MemoryPage>,
 }
 impl ProcfsMemoryMap {
 	fn map_path(pid: libc::pid_t) -> std::path::PathBuf {
@@ -48,39 +48,36 @@ impl ProcfsMemoryMap {
 			pages.push(page);
 		}
 
-		Ok(ProcfsMemoryMap {
-			pid,
-			pages
-		})
+		Ok(ProcfsMemoryMap { pid, pages })
 	}
 
 	fn parse_page_permissions(
-		string: &str
+		string: &str,
 	) -> Result<MemoryPagePermissions, MemoryPagePermissionsParseError> {
 		let mut chars = string.trim().chars();
 
 		let read = match chars.next() {
 			Some('r') => true,
 			Some('-') => false,
-			ch => return Err(MemoryPagePermissionsParseError::InvalidRead(ch))
+			ch => return Err(MemoryPagePermissionsParseError::InvalidRead(ch)),
 		};
 
 		let write = match chars.next() {
 			Some('w') => true,
 			Some('-') => false,
-			ch => return Err(MemoryPagePermissionsParseError::InvalidWrite(ch))
+			ch => return Err(MemoryPagePermissionsParseError::InvalidWrite(ch)),
 		};
 
 		let exec = match chars.next() {
 			Some('x') => true,
 			Some('-') => false,
-			ch => return Err(MemoryPagePermissionsParseError::InvalidExec(ch))
+			ch => return Err(MemoryPagePermissionsParseError::InvalidExec(ch)),
 		};
 
 		let share = match chars.next() {
 			Some('s') => true,
 			Some('p') => false,
-			ch => return Err(MemoryPagePermissionsParseError::InvalidShare(ch))
+			ch => return Err(MemoryPagePermissionsParseError::InvalidShare(ch)),
 		};
 
 		Ok(MemoryPagePermissions::new(read, write, exec, share))
@@ -100,14 +97,14 @@ impl ProcfsMemoryMap {
 				Some(exe) if path == exe => {
 					MemoryPageType::ProcessExecutable(std::path::PathBuf::from(path))
 				}
-				_ => MemoryPageType::File(std::path::PathBuf::from(path))
-			}
+				_ => MemoryPageType::File(std::path::PathBuf::from(path)),
+			},
 		}
 	}
 
 	fn parse_map_line(
 		line: &str,
-		exe_path: Option<&str>
+		exe_path: Option<&str>,
 	) -> Result<MemoryPage, MemoryPageParseError> {
 		let mut split = line.splitn(6, " ");
 
@@ -119,13 +116,13 @@ impl ProcfsMemoryMap {
 			range_split
 				.next()
 				.ok_or(MemoryPageParseError::InvalidRange)?,
-			16
+			16,
 		)?;
 		let to = u64::from_str_radix(
 			range_split
 				.next()
 				.ok_or(MemoryPageParseError::InvalidRange)?,
-			16
+			16,
 		)?;
 
 		let permissions =
@@ -140,14 +137,14 @@ impl ProcfsMemoryMap {
 
 		let page_type = Self::parse_page_type(
 			split.next().ok_or(MemoryPageParseError::InvalidEntry)?,
-			exe_path
+			exe_path,
 		);
 
 		Ok(MemoryPage {
 			address_range: [OffsetType::new_unwrap(from), OffsetType::new_unwrap(to)],
 			permissions,
 			offset,
-			page_type
+			page_type,
 		})
 	}
 }
@@ -166,7 +163,7 @@ pub enum MemoryPagePermissionsParseError {
 	#[error("invalid exec permission: {0:?}")]
 	InvalidExec(Option<char>),
 	#[error("invalid share permission: {0:?}")]
-	InvalidShare(Option<char>)
+	InvalidShare(Option<char>),
 }
 #[derive(Debug, Error)]
 pub enum MemoryPageParseError {
@@ -186,13 +183,16 @@ pub enum MemoryPageParseError {
 	#[error("could not parse range bounds")]
 	ParseUsize(#[from] std::num::ParseIntError),
 	#[error("could not parse map permissions")]
-	ParseMapPerms(#[from] MemoryPagePermissionsParseError)
+	ParseMapPerms(#[from] MemoryPagePermissionsParseError),
 }
 
 #[cfg(test)]
 mod test {
 	use super::ProcfsMemoryMap;
-	use crate::{memory::map::{MemoryPage, MemoryPagePermissions, MemoryPageType}, prelude::OffsetType};
+	use crate::{
+		memory::map::{MemoryPage, MemoryPagePermissions, MemoryPageType},
+		prelude::OffsetType,
+	};
 
 	#[test]
 	fn test_procfs_maps_parse() {

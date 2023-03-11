@@ -1,7 +1,6 @@
 //! Common definitions used across this library.
 
-use std::num::NonZeroU64;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, num::NonZeroU64};
 
 /// Type to represent the offset of the address space.
 ///
@@ -11,11 +10,7 @@ use std::convert::TryFrom;
 pub struct OffsetType(NonZeroU64);
 impl OffsetType {
 	pub fn new(offset: u64) -> Option<Self> {
-		Some(
-			OffsetType(
-				NonZeroU64::new(offset)?
-			)
-		)
+		Some(OffsetType(NonZeroU64::new(offset)?))
 	}
 
 	pub fn new_unwrap(offset: u64) -> Self {
@@ -37,9 +32,7 @@ impl TryFrom<u64> for OffsetType {
 	type Error = std::num::TryFromIntError;
 
 	fn try_from(value: u64) -> Result<Self, Self::Error> {
-		Ok(
-			OffsetType::from(NonZeroU64::try_from(value)?)
-		)
+		Ok(OffsetType::from(NonZeroU64::try_from(value)?))
 	}
 }
 impl From<NonZeroU64> for OffsetType {

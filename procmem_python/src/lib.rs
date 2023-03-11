@@ -1,5 +1,4 @@
-use pyo3::prelude::*;
-use pyo3::wrap_pyfunction;
+use pyo3::{prelude::*, wrap_pyfunction};
 
 use procmem_access;
 
@@ -11,9 +10,9 @@ use procmem_access;
 /// Procmem python bindings.
 #[pymodule]
 fn procmem_python(_py: Python, m: &PyModule) -> PyResult<()> {
-    // m.add_function(
+	// m.add_function(
 	// 	wrap_pyfunction!(sum_as_string, m)?
 	// )?;
 
-    Ok(())
+	Ok(())
 }

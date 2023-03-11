@@ -1,23 +1,19 @@
 use std::{
 	fs::{File, OpenOptions},
-	io::{Read, Seek, SeekFrom, Write}
+	io::{Read, Seek, SeekFrom, Write},
 };
 
 use thiserror::Error;
 
 use crate::{
 	common::OffsetType,
-	memory::access::{
-		MemoryAccess,
-		ReadError,
-		WriteError
-	}
+	memory::access::{MemoryAccess, ReadError, WriteError},
 };
 
 #[derive(Debug, Error)]
 pub enum ProcfsAccessError {
 	#[error("could not open memory file")]
-	MemoryIo(std::io::Error)
+	MemoryIo(std::io::Error),
 }
 
 /// Procfs implementation of memory access.
@@ -28,7 +24,7 @@ pub enum ProcfsAccessError {
 pub struct ProcfsAccess {
 	#[allow(dead_code)]
 	pid: libc::pid_t,
-	mem: File
+	mem: File,
 }
 impl ProcfsAccess {
 	pub fn mem_path(pid: libc::pid_t) -> std::path::PathBuf {
@@ -47,10 +43,7 @@ impl ProcfsAccess {
 			.open(path)
 			.map_err(|err| ProcfsAccessError::MemoryIo(err))?;
 
-		Ok(ProcfsAccess {
-			pid,
-			mem
-		})
+		Ok(ProcfsAccess { pid, mem })
 	}
 }
 impl MemoryAccess for ProcfsAccess {

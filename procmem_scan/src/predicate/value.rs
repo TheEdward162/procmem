@@ -4,7 +4,7 @@ use procmem_access::prelude::OffsetType;
 
 use crate::{
 	candidate::ScannerCandidate,
-	predicate::{ScannerPredicate, UpdateCandidateResult}
+	predicate::{ScannerPredicate, UpdateCandidateResult},
 };
 
 use super::PartialScannerPredicate;
@@ -33,7 +33,7 @@ macro_rules! impl_byte_comparable {
 						)
 					}
 				}
-			
+
 				fn align_of() -> usize {
 					std::mem::align_of::<Self>()
 				}
@@ -47,7 +47,7 @@ macro_rules! impl_byte_comparable {
 						)
 					}
 				}
-			
+
 				fn align_of() -> usize {
 					<$pod_type as ByteComparable>::align_of()
 				}
@@ -61,7 +61,7 @@ macro_rules! impl_byte_comparable {
 						)
 					}
 				}
-			
+
 				fn align_of() -> usize {
 					<$pod_type as ByteComparable>::align_of()
 				}
@@ -73,13 +73,13 @@ impl_byte_comparable! {
 	Pod: u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 usize isize f32 f64
 }
 impl ByteComparable for &'_ str {
-    fn as_bytes(&self) -> &[u8] {
-        str::as_bytes(self)
-    }
+	fn as_bytes(&self) -> &[u8] {
+		str::as_bytes(self)
+	}
 
-    fn align_of() -> usize {
-        std::mem::align_of::<u8>()
-    }
+	fn align_of() -> usize {
+		std::mem::align_of::<u8>()
+	}
 }
 
 /// Predicate scanning for a concrete value in memory.
@@ -87,7 +87,7 @@ impl ByteComparable for &'_ str {
 /// The value may be anything but is constrained to `ByteComparable` because it needs to be accessed as raw bytes safely.
 pub struct ValuePredicate<T: ByteComparable> {
 	value: T,
-	aligned: bool
+	aligned: bool,
 }
 impl<T: ByteComparable> ValuePredicate<T> {
 	/// Creates a new predicate.
@@ -106,7 +106,7 @@ impl<T: ByteComparable> ValuePredicate<T> {
 impl<T: ByteComparable> ScannerPredicate for ValuePredicate<T> {
 	fn try_start_candidate(&self, offset: OffsetType, byte: u8) -> Option<ScannerCandidate> {
 		let bytes = self.value.as_bytes();
-		
+
 		if self.offset_aligned(offset) {
 			if bytes[0] == byte {
 				let result = if bytes.len() == 1 {
@@ -126,17 +126,17 @@ impl<T: ByteComparable> ScannerPredicate for ValuePredicate<T> {
 		&self,
 		_offset: OffsetType,
 		byte: u8,
-		candidate: &ScannerCandidate
+		candidate: &ScannerCandidate,
 	) -> UpdateCandidateResult {
 		let bytes = self.value.as_bytes();
 		debug_assert!(candidate.length().get() < bytes.len());
 
 		if bytes[candidate.length().get()] != byte {
-			return UpdateCandidateResult::Remove
+			return UpdateCandidateResult::Remove;
 		}
 
 		if candidate.length().get() == bytes.len() - 1 {
-			return UpdateCandidateResult::Resolve
+			return UpdateCandidateResult::Resolve;
 		}
 
 		UpdateCandidateResult::Advance
@@ -147,26 +147,20 @@ impl<T: ByteComparable> PartialScannerPredicate for ValuePredicate<T> {
 		let mut candidates = Vec::new();
 
 		let bytes = self.value.as_bytes();
-		for (i, target_byte) in bytes
-			.iter()
-			.copied()
-			.enumerate()
-			.skip(1)
-			.rev()
-		{
+		for (i, target_byte) in bytes.iter().copied().enumerate().skip(1).rev() {
 			if byte != target_byte {
-				continue
+				continue;
 			}
 
 			let potential_start_offset = match offset.get().saturating_sub(i as u64) {
 				// skip this candidate if it would start at a non-positive offset
 				// even though starting at offset 1 is also pretty unreal, it is not against our invariants
 				0 => continue,
-				p => OffsetType::new_unwrap(p)
+				p => OffsetType::new_unwrap(p),
 			};
 
 			if !self.offset_aligned(potential_start_offset) {
-				continue
+				continue;
 			}
 
 			let length = NonZeroUsize::new(i + 1).unwrap();
@@ -189,10 +183,12 @@ mod test {
 
 	use procmem_access::prelude::OffsetType;
 
-    use super::ValuePredicate;
+	use super::ValuePredicate;
 	use crate::{
 		candidate::ScannerCandidate,
-		predicate::{ScannerPredicate, PartialScannerPredicate, UpdateCandidateResult, value::ByteComparable}
+		predicate::{
+			value::ByteComparable, PartialScannerPredicate, ScannerPredicate, UpdateCandidateResult,
+		},
 	};
 
 	#[test]
@@ -203,7 +199,9 @@ mod test {
 		let predicate = ValuePredicate::new([1], true);
 
 		// Works correctly
-		let result = predicate.try_start_candidate(OffsetType::new_unwrap(100), data[0]).unwrap();
+		let result = predicate
+			.try_start_candidate(OffsetType::new_unwrap(100), data[0])
+			.unwrap();
 		assert_eq!(result.offset(), OffsetType::new_unwrap(100));
 		assert_eq!(result.start_offset(), OffsetType::new_unwrap(100));
 		assert_eq!(result.length(), NonZeroUsize::new(1).unwrap());
@@ -211,9 +209,15 @@ mod test {
 		assert!(!result.is_resolved());
 
 		// Rejects unaligned
-		assert_eq!(predicate.try_start_candidate(OffsetType::new_unwrap(101), data[0]), None);
+		assert_eq!(
+			predicate.try_start_candidate(OffsetType::new_unwrap(101), data[0]),
+			None
+		);
 		// Rejects wrong start
-		assert_eq!(predicate.try_start_candidate(OffsetType::new_unwrap(100), data[1]), None);
+		assert_eq!(
+			predicate.try_start_candidate(OffsetType::new_unwrap(100), data[1]),
+			None
+		);
 	}
 
 	#[test]
@@ -222,7 +226,9 @@ mod test {
 
 		let predicate = ValuePredicate::new(1u8, false);
 
-		let result = predicate.try_start_candidate(OffsetType::new_unwrap(100), data).unwrap();
+		let result = predicate
+			.try_start_candidate(OffsetType::new_unwrap(100), data)
+			.unwrap();
 		assert_eq!(result.offset(), OffsetType::new_unwrap(100));
 		assert_eq!(result.start_offset(), OffsetType::new_unwrap(100));
 		assert_eq!(result.length(), NonZeroUsize::new(1).unwrap());
@@ -235,8 +241,9 @@ mod test {
 		let data = [1u8, 2, 3, 4];
 
 		let predicate = ValuePredicate::new([2u8, 3], false);
-		
-		let result = predicate.try_start_partial_candidates(OffsetType::new_unwrap(102), data[2])[0];
+
+		let result =
+			predicate.try_start_partial_candidates(OffsetType::new_unwrap(102), data[2])[0];
 		assert_eq!(result.offset(), OffsetType::new_unwrap(101));
 		assert_eq!(result.start_offset(), OffsetType::new_unwrap(102));
 		assert_eq!(result.length(), NonZeroUsize::new(2).unwrap());
@@ -250,7 +257,7 @@ mod test {
 		let data = unsafe {
 			std::slice::from_raw_parts(
 				&data_u16 as *const u16 as *const u8,
-				data_u16.len() * std::mem::size_of::<u16>()
+				data_u16.len() * std::mem::size_of::<u16>(),
 			)
 		};
 

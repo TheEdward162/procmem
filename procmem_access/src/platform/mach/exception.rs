@@ -1,10 +1,24 @@
 use thiserror::Error;
 
-use mach::{exception_types::{
+use mach::{
+	exception_types::{
 		exception_behavior_array_t, exception_behavior_t, exception_flavor_array_t,
 		exception_mask_array_t, exception_mask_t, EXCEPTION_DEFAULT, EXC_MASK_ALL,
 		MACH_EXCEPTION_CODES,
-	}, kern_return::{kern_return_t, KERN_SUCCESS}, mach_port::{mach_port_allocate, mach_port_insert_right}, mach_types::{exception_handler_array_t, exception_handler_t, task_t}, message::{MACH_MSG_SUCCESS, MACH_MSG_TYPE_MAKE_SEND, MACH_RCV_LARGE, MACH_RCV_MSG, MACH_RCV_TIMEOUT, MACH_RCV_TOO_LARGE, mach_msg, mach_msg_body_t, mach_msg_header_t, mach_msg_trailer_t, mach_msg_type_number_t}, port::{mach_port_name_t, mach_port_t, MACH_PORT_NULL, MACH_PORT_RIGHT_RECEIVE}, thread_status::{thread_state_flavor_t, THREAD_STATE_NONE}, traps::mach_task_self, vm_types::natural_t};
+	},
+	kern_return::{kern_return_t, KERN_SUCCESS},
+	mach_port::{mach_port_allocate, mach_port_insert_right},
+	mach_types::{exception_handler_array_t, exception_handler_t, task_t},
+	message::{
+		mach_msg, mach_msg_body_t, mach_msg_header_t, mach_msg_trailer_t, mach_msg_type_number_t,
+		MACH_MSG_SUCCESS, MACH_MSG_TYPE_MAKE_SEND, MACH_RCV_LARGE, MACH_RCV_MSG, MACH_RCV_TIMEOUT,
+		MACH_RCV_TOO_LARGE,
+	},
+	port::{mach_port_name_t, mach_port_t, MACH_PORT_NULL, MACH_PORT_RIGHT_RECEIVE},
+	thread_status::{thread_state_flavor_t, THREAD_STATE_NONE},
+	traps::mach_task_self,
+	vm_types::natural_t,
+};
 
 use super::TaskPort;
 
@@ -77,37 +91,34 @@ const EXC_TYPES_COUNT: usize = 14;
 #[derive(Debug)]
 struct MessageBufferBody {
 	pub info: mach_msg_body_t,
-	pub data: [u8]
+	pub data: [u8],
 }
 #[repr(C)]
 #[derive(Debug)]
 struct MessageBufferTrailer {
 	pub info: mach_msg_trailer_t,
-	pub data: [u8]
+	pub data: [u8],
 }
 
 #[repr(C)]
 struct MessageBuffer {
 	// The data needs to be "naturally" aligned.
-	buffer: Vec<natural_t>
+	buffer: Vec<natural_t>,
 }
 impl MessageBuffer {
 	const ELEMENT_SIZE: usize = std::mem::size_of::<natural_t>();
 	/// Minumum number of `natural_t`s that the buffer is initialized to.
 	const MINIMUM_SIZE: usize = Self::natural_count(
-		std::mem::size_of::<mach_msg_header_t>()
-		+ std::mem::size_of::<mach_msg_trailer_t>()
+		std::mem::size_of::<mach_msg_header_t>() + std::mem::size_of::<mach_msg_trailer_t>(),
 	);
 
 	const fn natural_count(byte_count: usize) -> usize {
-		byte_count / Self::ELEMENT_SIZE + (
-			byte_count % Self::ELEMENT_SIZE != 0
-		) as usize
+		byte_count / Self::ELEMENT_SIZE + (byte_count % Self::ELEMENT_SIZE != 0) as usize
 	}
 
 	pub fn new() -> Self {
 		MessageBuffer {
-			buffer: vec![0; Self::MINIMUM_SIZE]
+			buffer: vec![0; Self::MINIMUM_SIZE],
 		}
 	}
 
@@ -121,10 +132,8 @@ impl MessageBuffer {
 	/// Reserves space for at least `additional` more bytes.
 	pub fn reserve(&mut self, additional: usize) {
 		self.buffer.resize(
-			Self::natural_count(
-				self.buffer.len() * Self::ELEMENT_SIZE + additional
-			),
-			0
+			Self::natural_count(self.buffer.len() * Self::ELEMENT_SIZE + additional),
+			0,
 		)
 	}
 
@@ -133,40 +142,31 @@ impl MessageBuffer {
 	/// TODO: Can zeroed header be "valid" header? What even is documentation
 	pub fn header(&self) -> &mach_msg_header_t {
 		debug_assert!(self.buffer.len() >= Self::MINIMUM_SIZE);
-		
-		unsafe {
-			&*(self.buffer.as_ptr() as *const mach_msg_header_t)
-		}
+
+		unsafe { &*(self.buffer.as_ptr() as *const mach_msg_header_t) }
 	}
 
 	pub unsafe fn header_mut(&mut self) -> &mut mach_msg_header_t {
 		debug_assert!(self.buffer.len() >= Self::MINIMUM_SIZE);
-		
+
 		// Safe because it is correctly aligned and has enough space
-		unsafe {
-			&mut *(self.buffer.as_mut_ptr() as *mut mach_msg_header_t)
-		}
+		unsafe { &mut *(self.buffer.as_mut_ptr() as *mut mach_msg_header_t) }
 	}
 
 	/// Returns the bytes covering the body of the message according to the header.
 	pub fn body(&self) -> Option<&MessageBufferBody> {
 		const HEADER_SIZE: usize = std::mem::size_of::<mach_msg_header_t>();
-		
+
 		if self.header().msgh_size as usize <= HEADER_SIZE {
 			return None;
 		}
-		assert!(
-			self.header().msgh_size as usize <= self.size()
-		);
+		assert!(self.header().msgh_size as usize <= self.size());
 
 		let start = unsafe { (self.buffer.as_ptr() as *const u8).add(HEADER_SIZE) };
 		let size = self.header().msgh_size as usize - HEADER_SIZE;
-		
+
 		let rf = unsafe {
-			let ptr = std::ptr::slice_from_raw_parts(
-				start,
-				size
-			) as *const MessageBufferBody;
+			let ptr = std::ptr::slice_from_raw_parts(start, size) as *const MessageBufferBody;
 
 			&*ptr
 		};
@@ -179,23 +179,16 @@ impl MessageBuffer {
 			return None;
 		}
 		assert!(
-			self.header().msgh_size as usize + std::mem::size_of::<mach_msg_trailer_t>() <= self.size()
+			self.header().msgh_size as usize + std::mem::size_of::<mach_msg_trailer_t>()
+				<= self.size()
 		);
 
-		let start = unsafe {
-			(self.buffer.as_ptr() as *const u8).add(
-				self.header().msgh_size as usize
-			)
-		};
-		let size = unsafe {
-			(*(start as *const mach_msg_trailer_t)).msgh_trailer_size as usize
-		};
+		let start =
+			unsafe { (self.buffer.as_ptr() as *const u8).add(self.header().msgh_size as usize) };
+		let size = unsafe { (*(start as *const mach_msg_trailer_t)).msgh_trailer_size as usize };
 
 		let rf = unsafe {
-			let ptr = std::ptr::slice_from_raw_parts(
-				start,
-				size
-			) as *const MessageBufferTrailer;
+			let ptr = std::ptr::slice_from_raw_parts(start, size) as *const MessageBufferTrailer;
 
 			&*ptr
 		};
@@ -224,7 +217,7 @@ pub struct MachExceptionHandler {
 	task_port: TaskPort,
 	exception_port: TaskPort,
 
-	buffer: MessageBuffer
+	buffer: MessageBuffer,
 }
 impl MachExceptionHandler {
 	pub fn new(pid: libc::pid_t) -> Result<Self, MachExceptionHandlerError> {
@@ -243,7 +236,7 @@ impl MachExceptionHandler {
 			task_port,
 			exception_port,
 
-			buffer: MessageBuffer::new()
+			buffer: MessageBuffer::new(),
 		};
 		unsafe {
 			me.swap_exception_ports()

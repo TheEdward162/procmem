@@ -13,7 +13,7 @@ pub enum UpdateCandidateResult {
 	/// Candidate is no longer valid, remove it from the candidate pool.
 	Remove,
 	/// Resolve the candidate into the match.
-	Resolve
+	Resolve,
 }
 
 /// Scanner predicate is an interface which the scanner asks where
@@ -29,7 +29,7 @@ pub trait ScannerPredicate {
 		&self,
 		offset: OffsetType,
 		byte: u8,
-		candidate: &ScannerCandidate
+		candidate: &ScannerCandidate,
 	) -> UpdateCandidateResult;
 }
 impl<T: ScannerPredicate, U: std::ops::Deref<Target = T>> ScannerPredicate for U {
@@ -37,7 +37,12 @@ impl<T: ScannerPredicate, U: std::ops::Deref<Target = T>> ScannerPredicate for U
 		(**self).try_start_candidate(offset, byte)
 	}
 
-	fn update_candidate(&self, offset: OffsetType, byte: u8, candidate: &ScannerCandidate) -> UpdateCandidateResult {
+	fn update_candidate(
+		&self,
+		offset: OffsetType,
+		byte: u8,
+		candidate: &ScannerCandidate,
+	) -> UpdateCandidateResult {
 		(**self).update_candidate(offset, byte, candidate)
 	}
 }

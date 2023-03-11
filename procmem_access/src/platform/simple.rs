@@ -6,7 +6,7 @@
 
 #[cfg(target_os = "linux")]
 mod inner {
-	use super::super::{ptrace, procfs};
+	use super::super::{procfs, ptrace};
 
 	pub type SimpleMemoryLock = ptrace::PtraceLock;
 	pub type SimpleMemoryAccess = procfs::ProcfsAccess;
@@ -17,7 +17,7 @@ mod inner {
 
 #[cfg(target_os = "macos")]
 mod inner {
-	use super::super::{ptrace, mach as mch};
+	use super::super::{mach as mch, ptrace};
 
 	pub type SimpleMemoryLock = ptrace::PtraceLock;
 	pub type SimpleMemoryAccess = mch::MachAccess;
@@ -31,4 +31,4 @@ mod inner {
 	// TODO
 }
 
-pub use inner::{SimpleMemoryLock, SimpleMemoryAccess, SimpleMemoryMap, ProcessInfo};
+pub use inner::{ProcessInfo, SimpleMemoryAccess, SimpleMemoryLock, SimpleMemoryMap};

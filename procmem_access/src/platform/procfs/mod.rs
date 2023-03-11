@@ -6,12 +6,12 @@ pub use map::ProcfsMemoryMap;
 
 pub struct ProcessInfo {
 	pub pid: libc::pid_t,
-	pub name: String
+	pub name: String,
 }
 impl ProcessInfo {
 	pub fn list_all() -> std::io::Result<Vec<Self>> {
 		let mut processes = Vec::new();
-	
+
 		for entry in std::fs::read_dir("/proc/")? {
 			let entry = entry?;
 
@@ -19,14 +19,18 @@ impl ProcessInfo {
 				continue;
 			}
 
-			let pid = match entry.file_name().to_str().and_then(|e| e.parse::<libc::pid_t>().ok()) {
+			let pid = match entry
+				.file_name()
+				.to_str()
+				.and_then(|e| e.parse::<libc::pid_t>().ok())
+			{
 				None => continue,
-				Some(p) => p
+				Some(p) => p,
 			};
 
 			let info = match Self::for_pid(pid) {
 				Err(_) => continue,
-				Ok(i) => i
+				Ok(i) => i,
 			};
 
 			processes.push(info);
@@ -40,9 +44,7 @@ impl ProcessInfo {
 		Ok(Self { pid, name })
 	}
 
-	fn process_name(pid: libc::pid_t) -> std::io::Result<String> {	
-		std::fs::read_to_string(format!("/proc/{}/comm", pid)).map(
-			|s| s.trim().into()
-		)
+	fn process_name(pid: libc::pid_t) -> std::io::Result<String> {
+		std::fs::read_to_string(format!("/proc/{}/comm", pid)).map(|s| s.trim().into())
 	}
 }

@@ -2,7 +2,10 @@ use std::num::NonZeroUsize;
 
 use procmem_access::{prelude::OffsetType, util::AccFilter};
 
-use crate::{candidate::ScannerCandidate, predicate::{PartialScannerPredicate, ScannerPredicate, UpdateCandidateResult}};
+use crate::{
+	candidate::ScannerCandidate,
+	predicate::{PartialScannerPredicate, ScannerPredicate, UpdateCandidateResult},
+};
 
 /// Scan result consists of memory offset and length of the match.
 pub type ScanResult = (OffsetType, NonZeroUsize);
@@ -10,13 +13,13 @@ pub type ScanResult = (OffsetType, NonZeroUsize);
 /// Scans a stream of bytes for values matching the predicate.
 pub struct StreamScanner<P: ScannerPredicate> {
 	predicate: P,
-	candidates: Vec<ScannerCandidate>
+	candidates: Vec<ScannerCandidate>,
 }
 impl<P: ScannerPredicate> StreamScanner<P> {
 	pub fn new(predicate: P) -> Self {
 		StreamScanner {
 			predicate,
-			candidates: Vec::new()
+			candidates: Vec::new(),
 		}
 	}
 
@@ -34,22 +37,18 @@ impl<P: ScannerPredicate> StreamScanner<P> {
 	pub fn scan_once<I: Iterator<Item = u8>>(
 		&mut self,
 		offset: OffsetType,
-		stream: I
+		stream: I,
 	) -> StreamScannerIter<'_, P, I> {
 		self.reset();
 
-		StreamScannerIter::new(
-			self,
-			offset,
-			stream
-		)
+		StreamScannerIter::new(self, offset, stream)
 	}
 
 	fn on_byte(
 		&mut self,
 		offset: OffsetType,
 		byte: u8,
-		found: &mut Vec<(OffsetType, NonZeroUsize)>
+		found: &mut Vec<(OffsetType, NonZeroUsize)>,
 	) {
 		let mut i = 0;
 		while i < self.candidates.len() {
@@ -58,13 +57,10 @@ impl<P: ScannerPredicate> StreamScanner<P> {
 			// make sure to skip candidates that are in a different address range or that are resolved
 			if current.is_resolved() || current.end_offset().get() != offset.get() {
 				i += 1;
-				continue
+				continue;
 			}
 
-			match self
-				.predicate
-				.update_candidate(offset, byte, current)
-			{
+			match self.predicate.update_candidate(offset, byte, current) {
 				UpdateCandidateResult::Advance => {
 					self.candidates[i].advance();
 					i += 1;
@@ -83,9 +79,7 @@ impl<P: ScannerPredicate> StreamScanner<P> {
 					let mut candidate = self.candidates.remove(i);
 					candidate.resolve();
 
-					found.push(
-						(candidate.offset(), candidate.length())
-					);
+					found.push((candidate.offset(), candidate.length()));
 				}
 			}
 		}
@@ -93,11 +87,9 @@ impl<P: ScannerPredicate> StreamScanner<P> {
 		match self.predicate.try_start_candidate(offset, byte) {
 			None => (),
 			Some(candidate) if candidate.is_resolved() => {
-				found.push(
-					(candidate.offset(), candidate.length())
-				);
+				found.push((candidate.offset(), candidate.length()));
 			}
-			Some(candidate) => self.candidates.push(candidate)
+			Some(candidate) => self.candidates.push(candidate),
 		};
 	}
 }
@@ -109,65 +101,48 @@ impl<P: PartialScannerPredicate> StreamScanner<P> {
 	pub fn scan_partial<I: Iterator<Item = u8>>(
 		&mut self,
 		offset: OffsetType,
-		stream: I
+		stream: I,
 	) -> StreamScannerIter<'_, P, I> {
-		StreamScannerIter::new_partial(
-			self,
-			offset,
-			stream
-		)
+		StreamScannerIter::new_partial(self, offset, stream)
 	}
 
 	/// Merges the candidates from other scanner into self.
 	///
 	/// This has the same effect as replaying the same partial scans that were run on `other` on self.
-	pub fn merge_partial_mut(
-		&mut self,
-		mut other: Self
-	) {
-		self.candidates.append(
-			&mut other.candidates
-		);
+	pub fn merge_partial_mut(&mut self, mut other: Self) {
+		self.candidates.append(&mut other.candidates);
 	}
 
 	// /// Resolves partial candidates left over by previous calls to [`scan_partial`](StreamScanner::scan_partial) or [`merge_partial_mut`](StreamScanner::merge_partial_mut).
-	pub fn resolve_partial(
-		&mut self
-	) -> impl Iterator<Item = ScanResult> {
+	pub fn resolve_partial(&mut self) -> impl Iterator<Item = ScanResult> {
 		let mut resolved = Vec::new();
 
 		self.candidates.sort_unstable();
-		AccFilter::acc_filter_vec_mut(
-			&mut self.candidates,
-			|acc, curr| {
-				debug_assert!(
-					!curr.is_resolved() || curr.is_partial()
-				);
-				match acc {
-					None => acc.replace(curr),
-					Some(a) => match a.try_merge_mut(curr) {
-						Ok(()) => {
-							// TODO: Did I just exploit my own api?
-							if a.is_resolved() && !a.is_partial() {
-								resolved.push(
-									(a.offset(), a.length())
-								);
-								*acc = None;
-							}
-
-							None
+		AccFilter::acc_filter_vec_mut(&mut self.candidates, |acc, curr| {
+			debug_assert!(!curr.is_resolved() || curr.is_partial());
+			match acc {
+				None => acc.replace(curr),
+				Some(a) => match a.try_merge_mut(curr) {
+					Ok(()) => {
+						// TODO: Did I just exploit my own api?
+						if a.is_resolved() && !a.is_partial() {
+							resolved.push((a.offset(), a.length()));
+							*acc = None;
 						}
-						Err(other) => acc.replace(other)
+
+						None
 					}
-				}
+					Err(other) => acc.replace(other),
+				},
 			}
-		);
+		});
 
 		resolved.into_iter()
 	}
-	
+
 	fn on_start(&mut self, offset: OffsetType, byte: u8) {
-		self.candidates.extend(self.predicate.try_start_partial_candidates(offset, byte));
+		self.candidates
+			.extend(self.predicate.try_start_partial_candidates(offset, byte));
 	}
 }
 
@@ -180,21 +155,17 @@ pub struct StreamScannerIter<'a, P: ScannerPredicate, I: Iterator<Item = u8>> {
 	stream: I,
 	found: Vec<ScanResult>,
 	found_yield_index: usize,
-	reset_after: bool
+	reset_after: bool,
 }
 impl<'a, P: ScannerPredicate, I: Iterator<Item = u8>> StreamScannerIter<'a, P, I> {
-	pub fn new(
-		scanner: &'a mut StreamScanner<P>,
-		offset: OffsetType,
-		stream: I
-	) -> Self {
+	pub fn new(scanner: &'a mut StreamScanner<P>, offset: OffsetType, stream: I) -> Self {
 		StreamScannerIter {
 			scanner,
 			offset,
 			stream,
 			found: Vec::new(),
 			found_yield_index: 0,
-			reset_after: true
+			reset_after: true,
 		}
 	}
 
@@ -212,11 +183,7 @@ impl<'a, P: ScannerPredicate, I: Iterator<Item = u8>> StreamScannerIter<'a, P, I
 	}
 }
 impl<'a, P: PartialScannerPredicate, I: Iterator<Item = u8>> StreamScannerIter<'a, P, I> {
-	pub fn new_partial(
-		scanner: &'a mut StreamScanner<P>,
-		offset: OffsetType,
-		stream: I
-	) -> Self {
+	pub fn new_partial(scanner: &'a mut StreamScanner<P>, offset: OffsetType, stream: I) -> Self {
 		let mut stream = stream;
 
 		// unroll the first iteration to run `on_start` here.
@@ -232,7 +199,7 @@ impl<'a, P: PartialScannerPredicate, I: Iterator<Item = u8>> StreamScannerIter<'
 			stream,
 			found,
 			found_yield_index: 0,
-			reset_after: false
+			reset_after: false,
 		}
 	}
 }
@@ -255,14 +222,10 @@ impl<'a, P: ScannerPredicate, I: Iterator<Item = u8>> Iterator for StreamScanner
 						self.scanner.reset();
 					}
 
-					return None
+					return None;
 				}
 				Some(byte) => {
-					self.scanner.on_byte(
-						self.offset,
-						byte,
-						&mut self.found
-					);
+					self.scanner.on_byte(self.offset, byte, &mut self.found);
 
 					self.offset = self.offset.saturating_add(1);
 				}
@@ -283,8 +246,8 @@ mod test {
 
 	use procmem_access::prelude::OffsetType;
 
-    use super::StreamScanner;
-	use crate::predicate::value::{ValuePredicate, ByteComparable};
+	use super::StreamScanner;
+	use crate::predicate::value::{ByteComparable, ValuePredicate};
 
 	#[test]
 	fn test_stream_scanner() {
@@ -292,11 +255,17 @@ mod test {
 
 		let predicate = ValuePredicate::new(data, true);
 		let mut scanner = StreamScanner::new(predicate);
-		let found: Vec<_> = scanner.scan_once(
-			OffsetType::new_unwrap(1), data.iter().copied()
-		).collect();
+		let found: Vec<_> = scanner
+			.scan_once(OffsetType::new_unwrap(1), data.iter().copied())
+			.collect();
 
-		assert_eq!(found, &[(OffsetType::new_unwrap(1), NonZeroUsize::new(data.len()).unwrap())]);
+		assert_eq!(
+			found,
+			&[(
+				OffsetType::new_unwrap(1),
+				NonZeroUsize::new(data.len()).unwrap()
+			)]
+		);
 	}
 
 	#[test]
@@ -305,11 +274,14 @@ mod test {
 
 		let predicate = ValuePredicate::new(data, true);
 		let mut scanner = StreamScanner::new(predicate);
-		let found: Vec<_> = scanner.scan_once(
-			OffsetType::new_unwrap(1), std::iter::once(data)
-		).collect();
+		let found: Vec<_> = scanner
+			.scan_once(OffsetType::new_unwrap(1), std::iter::once(data))
+			.collect();
 
-		assert_eq!(found, &[(OffsetType::new_unwrap(1), NonZeroUsize::new(1).unwrap())]);
+		assert_eq!(
+			found,
+			&[(OffsetType::new_unwrap(1), NonZeroUsize::new(1).unwrap())]
+		);
 	}
 
 	#[test]
@@ -318,10 +290,9 @@ mod test {
 
 		let predicate = ValuePredicate::new([1u64, 0, 1, 0], true);
 		let mut scanner = StreamScanner::new(predicate);
-		let found: Vec<_> = scanner.scan_once(
-			OffsetType::new_unwrap(8),
-			data.as_bytes().iter().copied()
-		).collect();
+		let found: Vec<_> = scanner
+			.scan_once(OffsetType::new_unwrap(8), data.as_bytes().iter().copied())
+			.collect();
 
 		assert_eq!(
 			found,
@@ -333,7 +304,6 @@ mod test {
 		);
 	}
 
-	
 	#[test]
 	fn test_stream_scanner_partial_multiple_pages_sorted() {
 		let data = [2u64, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1];
@@ -344,17 +314,12 @@ mod test {
 
 		let mut found = Vec::new();
 		found.extend(
-			scanner.scan_partial(
-				OffsetType::new_unwrap(8),
-				data.as_bytes().iter().copied()
-			)
+			scanner.scan_partial(OffsetType::new_unwrap(8), data.as_bytes().iter().copied()),
 		);
-		found.extend(
-			scanner.scan_partial(
-				OffsetType::new_unwrap(112),
-				second_data.as_bytes().iter().copied()
-			)
-		);
+		found.extend(scanner.scan_partial(
+			OffsetType::new_unwrap(112),
+			second_data.as_bytes().iter().copied(),
+		));
 
 		assert_eq!(
 			found,
@@ -373,24 +338,16 @@ mod test {
 
 		let mut scanner = StreamScanner::new(predicate);
 
-		let found_scan_once: Vec<_> = scanner.scan_once(OffsetType::new_unwrap(1), data.iter().copied()).collect();
+		let found_scan_once: Vec<_> = scanner
+			.scan_once(OffsetType::new_unwrap(1), data.iter().copied())
+			.collect();
 
 		let mut found_scan_partial = Vec::new();
-		found_scan_partial.extend(
-			scanner.scan_partial(
-				OffsetType::new_unwrap(4),
-				data[3 ..].iter().copied()
-			)
-		);
-		found_scan_partial.extend(
-			scanner.scan_partial(
-				OffsetType::new_unwrap(1),
-				data[.. 3].iter().copied()
-			)
-		);
-		found_scan_partial.extend(
-			scanner.resolve_partial()
-		);
+		found_scan_partial
+			.extend(scanner.scan_partial(OffsetType::new_unwrap(4), data[3..].iter().copied()));
+		found_scan_partial
+			.extend(scanner.scan_partial(OffsetType::new_unwrap(1), data[..3].iter().copied()));
+		found_scan_partial.extend(scanner.resolve_partial());
 		found_scan_partial.sort_unstable();
 
 		assert_eq!(found_scan_once, found_scan_partial);
@@ -406,30 +363,16 @@ mod test {
 		let mut scanner_3 = StreamScanner::new(&predicate);
 
 		let mut found_scan_partial = Vec::new();
-		found_scan_partial.extend(
-			scanner_1.scan_partial(
-				OffsetType::new_unwrap(4),
-				data[3 .. 7].iter().copied()
-			)
-		);
-		found_scan_partial.extend(
-			scanner_2.scan_partial(
-				OffsetType::new_unwrap(1),
-				data[.. 3].iter().copied()
-			)
-		);
-		found_scan_partial.extend(
-			scanner_3.scan_partial(
-				OffsetType::new_unwrap(8),
-				data[7 .. ].iter().copied()
-			)
-		);
+		found_scan_partial
+			.extend(scanner_1.scan_partial(OffsetType::new_unwrap(4), data[3..7].iter().copied()));
+		found_scan_partial
+			.extend(scanner_2.scan_partial(OffsetType::new_unwrap(1), data[..3].iter().copied()));
+		found_scan_partial
+			.extend(scanner_3.scan_partial(OffsetType::new_unwrap(8), data[7..].iter().copied()));
 
 		scanner_2.merge_partial_mut(scanner_3);
 		scanner_1.merge_partial_mut(scanner_2);
-		found_scan_partial.extend(
-			scanner_1.resolve_partial()
-		);
+		found_scan_partial.extend(scanner_1.resolve_partial());
 		found_scan_partial.sort_unstable();
 
 		assert_eq!(
