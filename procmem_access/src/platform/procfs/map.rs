@@ -1,5 +1,4 @@
 use std::{
-	collections::HashMap,
 	fs::{self, OpenOptions},
 	io::Read
 };
@@ -32,7 +31,6 @@ impl ProcfsMemoryMap {
 	pub fn new(pid: libc::pid_t) -> Result<Self, ProcfsMemoryMapLoadError> {
 		let path = Self::map_path(pid);
 
-		let mut offset_map = HashMap::new();
 		let mut pages = Vec::new();
 
 		let mut file = OpenOptions::new().read(true).open(path)?;
@@ -52,8 +50,7 @@ impl ProcfsMemoryMap {
 
 		Ok(ProcfsMemoryMap {
 			pid,
-			pages,
-			offset_map
+			pages
 		})
 	}
 
