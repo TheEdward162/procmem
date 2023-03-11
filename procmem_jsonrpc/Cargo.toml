@@ -1,0 +1,16 @@
+[package]
+name = "procmem_jsonrpc"
+version = "0.1.0"
+authors = ["TheEdward162 <theedward162@gmail.com>"]
+edition = "2018"
+
+[features]
+default = ["implementation"]
+implementation = ["procmem_access", "procmem_scan"]
+
+[dependencies]
+procmem_access = { path = "../procmem_access", optional = true }
+procmem_scan = { path = "../procmem_scan", optional = true }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
