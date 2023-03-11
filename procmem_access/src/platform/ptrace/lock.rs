@@ -73,6 +73,8 @@ impl PtraceLock {
 			return Err(PtraceLockError::WaitpidError(std::io::Error::last_os_error()))
 		}
 		debug_assert_eq!(waitpid_res, self.pid);
+
+		Ok(())
 	}
 }
 #[cfg(target_os = "macos")]

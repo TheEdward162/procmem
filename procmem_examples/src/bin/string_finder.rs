@@ -42,7 +42,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let pages = MemoryPage::merge_sorted(
 		memory_map.pages().iter().filter(
 			|page| page.permissions.read() && match page.page_type {
-				MemoryPageType::ProcessExecutable(_) | MemoryPageType::Unknown => true,
+				MemoryPageType::ProcessExecutable(_) => true,
+				// TODO: macos memory map detection currently cannot categorize pages
+				#[cfg(target_os = "macos")]
+				MemoryPageType::Unknown => true,
 				_ => false
 			}
 		).cloned()

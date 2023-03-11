@@ -1,5 +1,4 @@
 use std::{
-	collections::HashMap,
 	fs::{self, OpenOptions},
 	io::Read
 };
@@ -32,7 +31,6 @@ impl ProcfsMemoryMap {
 	pub fn new(pid: libc::pid_t) -> Result<Self, ProcfsMemoryMapLoadError> {
 		let path = Self::map_path(pid);
 
-		let mut offset_map = HashMap::new();
 		let mut pages = Vec::new();
 
 		let mut file = OpenOptions::new().read(true).open(path)?;
@@ -52,8 +50,7 @@ impl ProcfsMemoryMap {
 
 		Ok(ProcfsMemoryMap {
 			pid,
-			pages,
-			offset_map
+			pages
 		})
 	}
 
@@ -118,13 +115,13 @@ impl ProcfsMemoryMap {
 			.next()
 			.ok_or(MemoryPageParseError::InvalidRange)?
 			.split('-');
-		let from = usize::from_str_radix(
+		let from = u64::from_str_radix(
 			range_split
 				.next()
 				.ok_or(MemoryPageParseError::InvalidRange)?,
 			16
 		)?;
-		let to = usize::from_str_radix(
+		let to = u64::from_str_radix(
 			range_split
 				.next()
 				.ok_or(MemoryPageParseError::InvalidRange)?,
@@ -139,7 +136,7 @@ impl ProcfsMemoryMap {
 		let offset = split
 			.next()
 			.ok_or(MemoryPageParseError::InvalidOffset)?
-			.parse::<usize>()?;
+			.parse::<u64>()?;
 
 		let page_type = Self::parse_page_type(
 			split.next().ok_or(MemoryPageParseError::InvalidEntry)?,

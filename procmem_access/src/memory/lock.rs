@@ -40,6 +40,6 @@ pub trait MemoryLock {
 	///
 	/// Should be called once for each [`lock`](MemoryAccess::lock) to unlock.
 	///
-	/// Returns `true< if the lock was released in this call (as opposed to just decreasing the counter).
+	/// Returns `true` if the lock was released in this call (as opposed to just decreasing the counter).
 	fn unlock(&mut self) -> Result<bool, UnlockError>;
 }

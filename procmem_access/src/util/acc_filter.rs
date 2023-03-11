@@ -54,8 +54,8 @@ impl<T, F: FnMut(&mut Option<T>, T) -> Option<T>> AccFilter<T, std::iter::Empty<
 		// we are going to manually move around values backed by this memory
 		// and cannot let a panic in `fun` cause a double-drop for non-copy Ts
 		unsafe {
-			vec.set_len(0)
-		};
+			vec.set_len(0);
+		}
 		
 		let mut acc = None;
 		let mut write_index = 0;
