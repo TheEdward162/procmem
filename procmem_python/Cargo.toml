@@ -2,11 +2,13 @@
 name = "procmem_python"
 version = "0.1.0"
 authors = ["TheEdward162 <thedward162@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
+pyo3 = { version = "0.18", features = ["extension-module", "abi3-py39"] }
+
 procmem_access = { path = "../procmem_access" }
-pyo3 = { version = "0.13", default-features = false, features = ["macros", "extension-module"] }
+procmem_scan = { path = "../procmem_scan" }

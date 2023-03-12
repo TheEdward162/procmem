@@ -138,8 +138,8 @@ impl MemoryPage {
 		self.address_range[1]
 	}
 
-	pub const fn size(&self) -> usize {
-		(self.end().get() - self.start().get()) as usize
+	pub const fn size(&self) -> u64 {
+		self.end().get() - self.start().get()
 	}
 }
 impl std::fmt::Display for MemoryPage {

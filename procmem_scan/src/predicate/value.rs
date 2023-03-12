@@ -14,9 +14,8 @@ pub trait ByteComparable {
 
 	/// Returns the alignment requirement of the type.
 	///
-	/// This is needed for when the implementor of this trait is a reference.
-	/// Then this function returns the alignment of the type behind reference, not of the reference itself.
-	fn align_of() -> usize;
+	/// If `Self` is a reference then this returns the alignment of the type behind reference.
+	fn align_of(&self) -> usize;
 }
 macro_rules! impl_byte_comparable {
 	(
@@ -34,7 +33,7 @@ macro_rules! impl_byte_comparable {
 					}
 				}
 
-				fn align_of() -> usize {
+				fn align_of(&self) -> usize {
 					std::mem::align_of::<Self>()
 				}
 			}
@@ -48,8 +47,22 @@ macro_rules! impl_byte_comparable {
 					}
 				}
 
-				fn align_of() -> usize {
-					<$pod_type as ByteComparable>::align_of()
+				fn align_of(&self) -> usize {
+					std::mem::align_of::<$pod_type>()
+				}
+			}
+			impl ByteComparable for [$pod_type] {
+				fn as_bytes(&self) -> &[u8] {
+					unsafe {
+						std::slice::from_raw_parts(
+							self.as_ptr() as *const u8,
+							std::mem::size_of::<$pod_type>() * self.len()
+						)
+					}
+				}
+
+				fn align_of(&self) -> usize {
+					std::mem::align_of::<$pod_type>()
 				}
 			}
 			impl ByteComparable for &'_ [$pod_type] {
@@ -62,8 +75,8 @@ macro_rules! impl_byte_comparable {
 					}
 				}
 
-				fn align_of() -> usize {
-					<$pod_type as ByteComparable>::align_of()
+				fn align_of(&self) -> usize {
+					std::mem::align_of::<$pod_type>()
 				}
 			}
 		)+
@@ -77,8 +90,20 @@ impl ByteComparable for &'_ str {
 		str::as_bytes(self)
 	}
 
-	fn align_of() -> usize {
+	fn align_of(&self) -> usize {
 		std::mem::align_of::<u8>()
+	}
+}
+impl<T> ByteComparable for Vec<T>
+where
+	[T]: ByteComparable,
+{
+	fn as_bytes(&self) -> &[u8] {
+		self.as_slice().as_bytes()
+	}
+
+	fn align_of(&self) -> usize {
+		std::mem::align_of::<T>()
 	}
 }
 
@@ -100,7 +125,7 @@ impl<T: ByteComparable> ValuePredicate<T> {
 	}
 
 	fn offset_aligned(&self, offset: OffsetType) -> bool {
-		!self.aligned || (offset.get() % T::align_of() as u64) == 0
+		!self.aligned || (offset.get() % self.value.align_of() as u64) == 0
 	}
 }
 impl<T: ByteComparable> ScannerPredicate for ValuePredicate<T> {

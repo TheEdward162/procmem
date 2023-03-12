@@ -394,7 +394,7 @@ mod app {
 			let mut new_matches = BTreeSet::default();
 			let mut chunk_buffer = Vec::new();
 			for page in self.pages.iter() {
-				chunk_buffer.resize(page.size(), 0);
+				chunk_buffer.resize(page.size() as usize, 0);
 
 				unsafe {
 					self.access
