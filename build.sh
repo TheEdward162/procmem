@@ -11,8 +11,8 @@ case "$1" in
 		##linker
 		# zig cc -target x86_64-linux-gnu "$@"
 
-		# scp target/x86_64-unknown-linux-gnu/release/libprocmem_python.so deck@192.168.0.171:Documents/procmem/procmem.so
-		# scp procmem_examples/python/repl.py deck@192.168.0.171:Documents/procmem/
+		scp target/x86_64-unknown-linux-gnu/release/libprocmem_python.so "deck@${2}:Documents/procmem/procmem.so"
+		scp procmem_examples/python/repl.py "deck@${2}:Documents/procmem/"
 	;;
 
 	*)

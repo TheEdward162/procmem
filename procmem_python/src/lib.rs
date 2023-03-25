@@ -17,6 +17,8 @@ fn err_to_pyerr<T: std::fmt::Display>(err: T) -> PyErr {
 }
 
 pub type PyOffsetType = u64;
+pub type PySizeType = u64;
+pub type PyMatch = (PyOffsetType, PySizeType);
 
 #[allow(non_camel_case_types)]
 pub enum MemValue {
@@ -96,6 +98,44 @@ pub struct PyProcmemSimple {
 	access: SimpleMemoryAccess,
 	user_locked: bool,
 }
+impl PyProcmemSimple {
+	fn scan_exact(
+		&mut self,
+		ranges: impl Iterator<Item = (PyOffsetType, PySizeType)>,
+		value: MemValue,
+		aligned: bool
+	) -> PyResult<HashSet<PyMatch>> {
+		self.lock.lock().map_err(err_to_pyerr)?;
+
+		let predicate = ValuePredicate::new(value, aligned);
+		let mut scanner = StreamScanner::new(predicate);
+
+		let mut matches = HashSet::new();
+		let mut chunk_buffer = Vec::new();
+		for (start, size) in ranges {
+			let start = OffsetType::new_unwrap(start);
+			chunk_buffer.resize(size as usize, 0u8);
+
+			unsafe {
+				self.access
+					.read(start, chunk_buffer.as_mut())
+					.map_err(err_to_pyerr)?;
+			}
+
+			matches.extend(
+				scanner
+					.scan_once(start, chunk_buffer.iter().copied())
+					.map(|(offset, size)| (
+						offset.get() as PyOffsetType, size.get() as PySizeType
+					)),
+			);
+		}
+
+		self.lock.unlock().map_err(err_to_pyerr)?;
+
+		Ok(matches)
+	}
+}
 #[pymethods]
 impl PyProcmemSimple {
 	#[new]
@@ -118,12 +158,9 @@ impl PyProcmemSimple {
 	}
 
 	pub fn pages(&self) -> Vec<PyMemoryPage> {
-		self.map
-			.pages()
-			.into_iter()
-			.cloned()
-			.map(PyMemoryPage::from)
-			.collect()
+		MemoryPage::merge_sorted(
+			self.map.pages().into_iter().cloned()
+		).map(PyMemoryPage::from).collect()
 	}
 
 	pub fn stop(&mut self) {
@@ -149,44 +186,49 @@ impl PyProcmemSimple {
 	}
 
 	#[pyo3(signature = (pages, value, value_type = "i32", aligned = true))]
-	pub fn scan_exact(
+	pub fn scan_exact_pages(
 		&mut self,
 		pages: &PyList,
 		value: &PyAny,
 		value_type: &str,
 		aligned: bool,
-	) -> PyResult<HashSet<PyOffsetType>> {
-		self.lock.lock().map_err(err_to_pyerr)?;
-
+	) -> PyResult<HashSet<PyMatch>> {
 		let value = MemValue::try_from_py(value, value_type)?;
 
-		let predicate = ValuePredicate::new(value, aligned);
-		let mut scanner = StreamScanner::new(predicate);
-
-		let mut matches = HashSet::new();
-		let mut chunk_buffer = Vec::new();
+		let mut parsed_pages = Vec::with_capacity(pages.len());
 		for page in pages {
 			let page: &PyCell<PyMemoryPage> = page.downcast()?;
 			let page = page.borrow();
 
-			chunk_buffer.resize(page.size() as usize, 0u8);
-
-			unsafe {
-				self.access
-					.read(page.0.start(), chunk_buffer.as_mut())
-					.map_err(err_to_pyerr)?;
-			}
-
-			matches.extend(
-				scanner
-					.scan_once(page.0.start(), chunk_buffer.iter().copied())
-					.map(|(offset, _)| offset.get()),
-			);
+			parsed_pages.push((
+				page.0.start().get(), page.0.size()
+			));
 		}
 
-		self.lock.unlock().map_err(err_to_pyerr)?;
+		self.scan_exact(
+			parsed_pages.into_iter(),
+			value,
+			aligned
+		)
+	}
 
-		Ok(matches)
+	#[pyo3(signature = (addresses, value, value_type = "i32", aligned = true))]
+	pub fn scan_exact_addresses(
+		&mut self,
+		addresses: &PyList,
+		value: &PyAny,
+		value_type: &str,
+		aligned: bool,
+	) -> PyResult<HashSet<PyMatch>> {
+		let value = MemValue::try_from_py(value, value_type)?;
+
+		let parsed_addresses: Vec<(PyOffsetType, PySizeType)> = addresses.extract()?;
+
+		self.scan_exact(
+			parsed_addresses.into_iter(),
+			value,
+			aligned
+		)
 	}
 
 	#[pyo3(signature = (offset, value_type = "i32"))]
@@ -355,6 +397,8 @@ impl PyProcessInfo {
 /// Procmem python bindings
 #[pymodule]
 fn procmem(_py: Python, m: &PyModule) -> PyResult<()> {
+	m.add("version", env!("CARGO_PKG_VERSION"))?;
+	
 	m.add_class::<PyProcmemSimple>()?;
 	m.add_class::<PyMemoryPage>()?;
 	m.add_class::<PyMemoryPagePermissions>()?;

@@ -277,7 +277,7 @@ dependencies = [
 
 [[package]]
 name = "procmem_examples"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "procmem_access",
@@ -287,7 +287,7 @@ dependencies = [
 
 [[package]]
 name = "procmem_python"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "procmem_access",
  "procmem_scan",

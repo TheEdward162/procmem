@@ -211,6 +211,7 @@ impl MemoryLock for PtraceLock {
 
 	fn unlock(&mut self) -> Result<bool, UnlockError> {
 		if self.lock_counter == 0 {
+			unsafe { self.ptrace_cont().unwrap(); }
 			return Err(UnlockError::NotLocked);
 		}
 

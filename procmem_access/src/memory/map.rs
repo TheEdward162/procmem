@@ -112,8 +112,16 @@ impl MemoryPage {
 		];
 		self.permissions = self.permissions & other.permissions;
 		self.offset = self.offset.min(other.offset);
-		if self.page_type != other.page_type {
-			self.page_type = MemoryPageType::Unknown;
+		
+		match (&self.page_type, &other.page_type) {
+			(page_type, MemoryPageType::Unknown)
+			| (MemoryPageType::Unknown, page_type) => {
+				self.page_type = page_type.clone();
+			}
+			(pt1, pt2) if pt1 == pt2 => (),
+			_ => {
+				self.page_type = MemoryPageType::Unknown;
+			}
 		};
 
 		Ok(())
