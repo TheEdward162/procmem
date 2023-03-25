@@ -1,0 +1,33 @@
+{
+	"name": "procmem-decky",
+	"version": "0.1.0",
+	"type": "module",
+	"dependencies": {
+		"decky-frontend-lib": "^3.19.2",
+		"react-icons": "^4.8.0"
+	},
+	"devDependencies": {
+		"@rollup/plugin-commonjs": "^24.0.1",
+		"@rollup/plugin-node-resolve": "^15.0.1",
+		"@rollup/plugin-replace": "^5.0.2",
+		"@rollup/plugin-typescript": "^11.0.0",
+		"@types/react": "^18.0.29",
+		"rimraf": "^4.4.1",
+		"rollup": "^3.20.2",
+		"rollup-plugin-import-assets": "^1.1.1",
+		"tslib": "^2.5.0",
+		"typescript": "^5.0.2"
+	},
+	"pnpm": {
+		"peerDependencyRules": {
+			"ignoreMissing": [
+				"react",
+				"react-dom"
+			]
+		}
+	},
+	"scripts": {
+		"build": "rimraf dist/ && rollup -c",
+		"build:watch": "yarn build --watch --watch.onEnd './pack.sh'"
+	}
+}
